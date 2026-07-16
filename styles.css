@@ -125,8 +125,8 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0 2rem;
-    gap: 2rem;
+    padding: 0.8rem 1rem;
+    gap: 1rem;
 }
 
 .logo a {
@@ -194,19 +194,19 @@ body {
 
 /* Sections */
 section {
-    padding: 3rem 2rem;
+    padding: 2rem 1.5rem;
     max-width: 1400px;
     margin: 0 auto;
 }
 
 .section-header {
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
 }
 
 /* Slider */
 .banner-slider {
     position: relative;
-    padding: 2rem;
+    padding: 1rem 1.5rem;
 }
 
 .slider-container {
@@ -285,7 +285,7 @@ section {
 /* Grids & Carousels */
 .ranking-grid, .comic-carousel {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
     gap: 1.5rem;
 }
 
@@ -565,15 +565,47 @@ section {
 }
 @keyframes spin { 100% { transform: rotate(360deg); } }
 
-/* Responsive */
+/* Responsive cho Điện Thoại (chuẩn iPhone SE 2020 - 4.7 inch) */
 @media (max-width: 768px) {
-    .header-container { flex-direction: column; padding: 1rem; gap: 1rem; }
-    .main-nav { width: 100%; justify-content: space-between; }
-    .search-container { max-width: none; flex: 1; margin-left: 1rem; }
-    .ranking-grid, .comic-carousel { grid-template-columns: repeat(2, 1fr); gap: 1rem; }
-    .comic-carousel .comic-card { min-width: 150px; }
-    .detail-header { flex-direction: column; align-items: center; text-align: center; }
-    .slider-container { aspect-ratio: 16/9; }
-    .slide-title { font-size: 1.5rem; }
+    body { font-size: 14px; }
+    .classic-title { font-size: 1.6rem; }
+    .section-title { font-size: 1.3rem; }
+    
+    .header-container { flex-direction: column; padding: 0.8rem; gap: 0.8rem; }
+    .main-nav { width: 100%; justify-content: space-between; gap: 0.5rem; }
+    .nav-btn { font-size: 0.9rem; }
+    .search-container { max-width: 100%; flex: 1; margin: 0; }
+    .classic-input { padding: 8px 12px; font-size: 0.9rem; }
+    
+    section { padding: 1.5rem 1rem; }
+    .banner-slider { padding: 1rem; }
+    
+    .slider-container { aspect-ratio: 16/10; border-radius: 8px; }
     .slide-info { padding: 2rem 1rem 1rem; }
+    .slide-title { font-size: 1.2rem; margin-bottom: 0.5rem; }
+    .slider-btn { width: 35px; height: 35px; font-size: 1rem; }
+    .slider-btn.prev { left: 0.5rem; }
+    .slider-btn.next { right: 0.5rem; }
+    
+    .ranking-grid, .comic-carousel { grid-template-columns: repeat(2, 1fr); gap: 0.8rem; }
+    .comic-carousel .comic-card { min-width: 130px; }
+    
+    .card-info { padding: 0.6rem; }
+    .card-title { font-size: 0.9rem; }
+    .card-meta { font-size: 0.75rem; }
+    .card-badge { padding: 3px 8px; font-size: 0.65rem; top: 6px; left: 6px; }
+    
+    .modal-content { padding: 1.5rem 1rem; width: 95%; max-height: 90vh; overflow-y: auto; }
+    .detail-header { flex-direction: column; align-items: center; text-align: center; gap: 1rem; }
+    .detail-header img { width: 130px; }
+    .detail-title h2 { font-size: 1.4rem; }
+    .tags { justify-content: center; }
+    .tag { font-size: 0.75rem; padding: 3px 8px; }
+    
+    .pagination { gap: 0.8rem; margin-top: 1.5rem; }
+    .pagination .classic-btn { padding: 6px 10px; font-size: 0.85rem; }
+    .pagination .page-info { font-size: 1rem; }
+    
+    .reader-header { padding: 0.8rem 1rem; }
+    .simple-footer { padding: 2rem 1rem; margin-top: 2rem; }
 }
