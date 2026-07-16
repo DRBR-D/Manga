@@ -28,6 +28,10 @@ body {
     overflow-x: hidden;
 }
 
+body.modal-open {
+    overflow: hidden;
+}
+
 /* Classic Typography */
 .classic-title {
     font-family: 'Playfair Display', serif;
@@ -47,6 +51,11 @@ body {
     font-size: 1.5rem;
     color: var(--gold);
     letter-spacing: 1px;
+}
+
+.tag:hover {
+    background: var(--gold);
+    color: #000;
 }
 
 .section-title {
