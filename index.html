@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>NOKAI HAVA - Classic Manga</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="main-header">
+        <div class="header-container">
+            <div class="logo">
+                <a href="#" onclick="location.reload()">
+                    <h1 class="classic-title">NOKAI <span>HAVA</span></h1>
+                </a>
+            </div>            
+            
+            <nav class="main-nav">
+                <button class="nav-btn" id="random-btn"><i class="fas fa-random"></i> Ngẫu nhiên</button>
+                
+                <div class="search-container">
+                    <input type="text" placeholder="Tìm kiếm truyện..." id="search-input" class="classic-input">
+                    <button class="search-btn classic-btn" id="search-btn"><i class="fas fa-search"></i></button>
+                    <div class="search-results" id="search-results"></div>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <div id="main-content">
+        <!-- Banner Slider -->
+        <section class="banner-slider">
+            <div class="slider-container">
+                <div class="slider" id="banner-slider">
+                    <!-- Slides will be added by JS -->
+                </div>
+                <button class="slider-btn prev classic-btn" onclick="moveSlide(-1)">❮</button>
+                <button class="slider-btn next classic-btn" onclick="moveSlide(1)">❯</button>            
+            </div>
+        </section>
+
+        <!-- Featured Comics - Ranking -->
+        <section class="ranking-section">
+            <div class="section-header">
+                <h2 class="section-title"><i class="fas fa-crown"></i> TOP NỔI BẬT</h2>
+            </div>
+            <div class="ranking-grid" id="ranking-grid">
+                <!-- Top comics will be added by JS -->
+            </div>
+        </section>
+
+        <!-- Newly Updated Comics -->
+        <section class="comic-section">
+            <div class="section-header">
+                <h2 class="section-title"><i class="fas fa-clock"></i> MỚI CẬP NHẬT</h2>
+            </div>
+            <div class="ranking-grid" id="new-comics-grid">
+                <!-- New comics will be added by JS -->
+            </div>
+            
+            <div class="pagination" id="new-comics-pagination">
+                <button class="classic-btn" id="prev-page-btn" disabled><i class="fas fa-chevron-left"></i> Trang Trước</button>
+                <span class="page-info" id="page-info">Trang 1</span>
+                <button class="classic-btn" id="next-page-btn">Trang Tiếp <i class="fas fa-chevron-right"></i></button>
+            </div>
+        </section>
+    </div>
+
+    <!-- Search Results View (Hidden by default) -->
+    <div id="search-view" style="display: none; padding: 2rem; min-height: 50vh;">
+        <div class="section-header">
+            <h2 class="section-title" id="search-title">KẾT QUẢ TÌM KIẾM</h2>
+            <button class="classic-btn" onclick="closeSearch()" style="padding: 8px 16px;">
+                <i class="fas fa-arrow-left"></i> Quay lại
+            </button>
+        </div>
+        <div class="ranking-grid" id="search-grid">
+            <!-- Search results added by JS -->
+        </div>
+    </div>
+
+    <!-- Simple Footer -->
+    <footer class="simple-footer">
+        <div class="footer-copyright">
+            <h3 class="classic-title-small">NOKAI HAVA</h3>
+            <span class="tagline">Thư viện truyện tranh cổ điển</span>
+            <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 10px;">@ 2025 All Rights Reserved</p>
+        </div>
+    </footer>
+
+    <!-- Manga Detail Modal -->
+    <div id="detail-modal" class="modal">
+        <div class="modal-content classic-box">
+            <button class="close-btn classic-btn" id="close-detail"><i class="fas fa-times"></i></button>
+            <div class="detail-header" id="detail-header"></div>
+            <div class="detail-info" id="detail-info"></div>
+            <button class="read-btn classic-btn primary-btn" id="start-read-btn">
+                <i class="fas fa-book-reader"></i> ĐỌC NGAY
+            </button>
+        </div>
+    </div>
+
+    <!-- Reader View -->
+    <div id="reader-view" class="reader-view hidden">
+        <header class="reader-header classic-box">
+            <button class="back-btn classic-btn" id="back-to-detail"><i class="fas fa-arrow-left"></i></button>
+            <div class="reader-progress section-title" id="reader-progress">1 / 10</div>
+        </header>
+        <div class="reader-content" id="reader-content">
+            <!-- Pages will be injected here -->
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
