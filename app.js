@@ -3,7 +3,7 @@
  */
 
 const API_BASE = "https://nhentai.net/api/v2";
-const USE_PROXY = false; // Bật true nếu cần vượt CORS trên trình duyệt
+const USE_PROXY = true; // Bật true để vượt lỗi CORS trên GitHub Pages
 const PROXY_URL = "https://api.allorigins.win/raw?url=";
 
 const THUMB_SERVERS = ["t1.nhentai.net", "t2.nhentai.net", "t3.nhentai.net", "t4.nhentai.net"];
