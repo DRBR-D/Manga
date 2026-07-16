@@ -81,6 +81,8 @@ function getPageUrl(manga, page, idx) {
 async function fetchAPI(endpoint, params = {}) {
     try {
         const url = new URL(`${API_BASE}/${endpoint}`);
+        // Chèn thêm time để chống cache (bảo đảm luôn lấy truyện mới nhất)
+        params['_t'] = Date.now();
         Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
         const finalUrl = USE_PROXY ? `${PROXY_URL}${encodeURIComponent(url.toString())}` : url.toString();
         
@@ -270,24 +272,18 @@ document.getElementById('random-btn').addEventListener('click', async (e) => {
 });
 
 window.performSearchTag = async function(tagId, tagName) {
+    // Đóng cửa sổ chi tiết truyện
     detailModal.classList.remove("active");
     document.body.classList.remove("modal-open");
-    mainContent.style.display = "none";
-    searchView.style.display = "block";
-    searchGrid.innerHTML = `<div class="loader"></div>`;
-    searchTitle.textContent = `THỂ LOẠI: "${tagName}"`;
     
-    try {
-        const res = await fetchAPI("galleries/tagged", { tag_id: tagId, page: 1, sort: "recent" });
-        searchGrid.innerHTML = "";
-        if (res.result && res.result.length > 0) {
-            res.result.forEach(m => searchGrid.appendChild(createComicCard(m)));
-        } else {
-            searchGrid.innerHTML = `<p style="grid-column: 1/-1; text-align: center;">Không tìm thấy truyện.</p>`;
-        }
-    } catch (e) {
-        searchGrid.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: var(--gold);">Lỗi tải thể loại.</p>`;
-    }
+    // Tự động điền tên thẻ vào ô tìm kiếm và thực hiện tìm kiếm luôn
+    searchInput.value = tagName;
+    
+    // Lướt nhẹ lên đầu trang để tiện xem kết quả
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    
+    // Gọi hàm tìm kiếm chung
+    performSearch(tagName);
 }
 
 // === MODAL & READER ===
