@@ -223,6 +223,18 @@ async function performSearch(query) {
     searchTitle.textContent = `KẾT QUẢ CHO: "${query}"`;
     
     try {
+        // Tìm bằng ID (nếu query chỉ chứa số)
+        if (/^\d+$/.test(query)) {
+            try {
+                const book = await fetchAPI(`galleries/${query}`);
+                searchGrid.innerHTML = "";
+                searchGrid.appendChild(createComicCard(book));
+                return;
+            } catch(e) {
+                // Nếu không có ID nào, tiếp tục search thường
+            }
+        }
+        
         const res = await fetchAPI("search", { query, page: 1 });
         searchGrid.innerHTML = "";
         if (res.result && res.result.length > 0) {
@@ -257,8 +269,30 @@ document.getElementById('random-btn').addEventListener('click', async (e) => {
     }
 });
 
+window.performSearchTag = async function(tagId, tagName) {
+    detailModal.classList.remove("active");
+    document.body.classList.remove("modal-open");
+    mainContent.style.display = "none";
+    searchView.style.display = "block";
+    searchGrid.innerHTML = `<div class="loader"></div>`;
+    searchTitle.textContent = `THỂ LOẠI: "${tagName}"`;
+    
+    try {
+        const res = await fetchAPI("galleries/tagged", { tag_id: tagId, page: 1, sort: "recent" });
+        searchGrid.innerHTML = "";
+        if (res.result && res.result.length > 0) {
+            res.result.forEach(m => searchGrid.appendChild(createComicCard(m)));
+        } else {
+            searchGrid.innerHTML = `<p style="grid-column: 1/-1; text-align: center;">Không tìm thấy truyện.</p>`;
+        }
+    } catch (e) {
+        searchGrid.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: var(--gold);">Lỗi tải thể loại.</p>`;
+    }
+}
+
 // === MODAL & READER ===
 async function openDetail(id) {
+    document.body.classList.add("modal-open");
     detailModal.classList.add("active");
     detailHeader.innerHTML = `<div class="loader"></div>`;
     detailInfo.innerHTML = "";
@@ -269,7 +303,7 @@ async function openDetail(id) {
         const coverUrl = getCoverUrl(currentBook);
         const title = currentBook.title?.pretty || currentBook.title?.english || "Unknown";
         const tagsList = currentBook.tags || [];
-        const tagsHtml = tagsList.slice(0, 8).map(t => `<span class="tag">${t.name}</span>`).join('');
+        const tagsHtml = tagsList.slice(0, 12).map(t => `<span class="tag" onclick="performSearchTag(${t.id}, '${t.name.replace(/'/g, "\\'")}')" style="cursor: pointer;">${t.name}</span>`).join('');
             
         detailHeader.innerHTML = `
             <img src="${coverUrl}" alt="Cover">
@@ -294,6 +328,7 @@ async function openDetail(id) {
 
 closeDetailBtn.addEventListener("click", () => {
     detailModal.classList.remove("active");
+    document.body.classList.remove("modal-open");
 });
 
 startReadBtn.addEventListener("click", () => {
@@ -323,6 +358,7 @@ startReadBtn.addEventListener("click", () => {
 backToDetailBtn.addEventListener("click", () => {
     readerView.classList.add("hidden");
     detailModal.classList.add("active");
+    document.body.classList.add("modal-open");
 });
 
 const imgObserver = new IntersectionObserver((entries) => {
