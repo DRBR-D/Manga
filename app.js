@@ -351,5 +351,67 @@ function updateProgress() {
     readerProgress.textContent = `${currentIdx + 1} / ${currentBook.num_pages}`;
 }
 
+// === PULL TO REFRESH & SMART HEADER ===
+const mainHeader = document.querySelector(".main-header");
+const ptrIndicator = document.getElementById("ptr-indicator");
+let lastScrollY = window.scrollY;
+
+// Hiện header khi ở top, ẩn khi cuộn xuống
+window.addEventListener("scroll", () => {
+    const currentScrollY = window.scrollY;
+    
+    // Nếu không phải đang trong chế độ đọc truyện thì mới xử lý header
+    if (readerView.classList.contains("hidden")) {
+        if (currentScrollY > 60) {
+            mainHeader.classList.add("hide-header");
+        } else if (currentScrollY <= 0) {
+            mainHeader.classList.remove("hide-header");
+        }
+    }
+    lastScrollY = currentScrollY;
+});
+
+// Vuốt xuống tải lại (Pull-to-refresh)
+let touchStartY = 0;
+let touchCurrentY = 0;
+let isPulling = false;
+
+window.addEventListener("touchstart", (e) => {
+    // Chỉ kích hoạt pull to refresh khi ở trang chủ và scroll trên cùng
+    if (window.scrollY <= 0 && readerView.classList.contains("hidden")) {
+        touchStartY = e.touches[0].clientY;
+        isPulling = true;
+    } else {
+        isPulling = false;
+    }
+}, { passive: true });
+
+window.addEventListener("touchmove", (e) => {
+    if (!isPulling) return;
+    touchCurrentY = e.touches[0].clientY;
+    const pullDistance = touchCurrentY - touchStartY;
+    
+    if (pullDistance > 10 && pullDistance < 120) {
+        ptrIndicator.style.transform = `translateY(${pullDistance - 60}px)`;
+        ptrIndicator.innerHTML = `<i class="fas fa-arrow-down"></i> Kéo tiếp để tải lại...`;
+    } else if (pullDistance >= 120) {
+        ptrIndicator.style.transform = `translateY(0)`;
+        ptrIndicator.innerHTML = `<i class="fas fa-sync-alt fa-spin"></i> Buông ra để tải lại!`;
+    }
+}, { passive: true });
+
+window.addEventListener("touchend", () => {
+    if (!isPulling) return;
+    const pullDistance = touchCurrentY - touchStartY;
+    
+    if (pullDistance >= 120) {
+        ptrIndicator.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Đang tải...`;
+        setTimeout(() => location.reload(), 300);
+    } else {
+        ptrIndicator.style.transform = `translateY(-100%)`;
+    }
+    isPulling = false;
+});
+
 // Run
 initApp();
