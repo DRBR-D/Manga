@@ -42,26 +42,40 @@ let currentBook = null;
 let currentSlide = 0;
 let currentNewPage = 1;
 
-// === API HELPERS ===
 function pickServer(servers, mediaId) {
     const hash = String(mediaId).split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
     return servers[hash % servers.length];
 }
 
-function getThumbUrl(mediaId, path) {
-    const srv = pickServer(THUMB_SERVERS, mediaId);
-    return `https://${srv}/${path}`;
+function getThumbUrl(manga) {
+    if (manga.thumbnail && typeof manga.thumbnail === 'string') {
+        if (manga.thumbnail.startsWith("http")) return manga.thumbnail;
+        return `https://${pickServer(THUMB_SERVERS, manga.media_id)}/${manga.thumbnail}`;
+    }
+    if (manga.images && manga.images.thumbnail) {
+        const ext = IMG_EXT[manga.images.thumbnail.t] || 'jpg';
+        return `https://${pickServer(THUMB_SERVERS, manga.media_id)}/galleries/${manga.media_id}/thumb.${ext}`;
+    }
+    return `https://${pickServer(THUMB_SERVERS, manga.media_id)}/galleries/${manga.media_id}/thumb.webp`;
 }
 
-function getCoverUrl(mediaId, imgType = "j") {
-    const ext = IMG_EXT[imgType] || "jpg";
-    const srv = pickServer(THUMB_SERVERS, mediaId);
-    return `https://${srv}/galleries/${mediaId}/cover.${ext}`;
+function getCoverUrl(manga) {
+    if (manga.cover && manga.cover.path) {
+        return `https://${pickServer(THUMB_SERVERS, manga.media_id)}/${manga.cover.path}`;
+    }
+    if (manga.images && manga.images.cover) {
+        const ext = IMG_EXT[manga.images.cover.t] || 'jpg';
+        return `https://${pickServer(THUMB_SERVERS, manga.media_id)}/galleries/${manga.media_id}/cover.${ext}`;
+    }
+    return `https://${pickServer(THUMB_SERVERS, manga.media_id)}/galleries/${manga.media_id}/cover.jpg`;
 }
 
-function getImageUrl(mediaId, path) {
-    const srv = pickServer(IMG_SERVERS, mediaId);
-    return `https://${srv}/${path}`;
+function getPageUrl(manga, page, idx) {
+    if (page.path) {
+        return `https://${pickServer(IMG_SERVERS, manga.media_id)}/${page.path}`;
+    }
+    const ext = IMG_EXT[page.t] || 'jpg';
+    return `https://${pickServer(IMG_SERVERS, manga.media_id)}/galleries/${manga.media_id}/${idx + 1}.${ext}`;
 }
 
 async function fetchAPI(endpoint, params = {}) {
@@ -85,7 +99,7 @@ function createComicCard(manga) {
     const card = document.createElement("div");
     card.className = "comic-card";
     
-    const thumbUrl = manga.thumbnail.startsWith("http") ? manga.thumbnail : getThumbUrl(manga.media_id, manga.thumbnail);
+    const thumbUrl = getThumbUrl(manga);
     const title = manga.english_title || manga.title?.pretty || "Unknown";
     const isNew = Date.now()/1000 - manga.upload_date < 86400 * 3 ? '<div class="card-badge">HOT</div>' : '';
     
@@ -110,8 +124,7 @@ function createSlide(manga) {
     const slide = document.createElement("div");
     slide.className = "slide";
     
-    // For slide, we try to use cover instead of thumb for better res
-    const coverUrl = getCoverUrl(manga.media_id, "j");
+    const coverUrl = getCoverUrl(manga);
     const title = manga.title?.pretty || manga.title?.english || "Unknown";
     
     slide.innerHTML = `
@@ -253,9 +266,10 @@ async function openDetail(id) {
     
     try {
         currentBook = await fetchAPI(`galleries/${id}`);
-        const coverUrl = getThumbUrl(currentBook.media_id, currentBook.cover.path);
-        const title = currentBook.title.pretty || currentBook.title.english;
-        const tagsHtml = currentBook.tags.slice(0, 8).map(t => `<span class="tag">${t.name}</span>`).join('');
+        const coverUrl = getCoverUrl(currentBook);
+        const title = currentBook.title?.pretty || currentBook.title?.english || "Unknown";
+        const tagsList = currentBook.tags || [];
+        const tagsHtml = tagsList.slice(0, 8).map(t => `<span class="tag">${t.name}</span>`).join('');
             
         detailHeader.innerHTML = `
             <img src="${coverUrl}" alt="Cover">
@@ -288,8 +302,10 @@ startReadBtn.addEventListener("click", () => {
     readerView.classList.remove("hidden");
     readerContent.innerHTML = "";
     
-    currentBook.pages.forEach((page, idx) => {
-        const imgUrl = getImageUrl(currentBook.media_id, page.path);
+    const pages = currentBook.pages || (currentBook.images ? currentBook.images.pages : []);
+    
+    pages.forEach((page, idx) => {
+        const imgUrl = getPageUrl(currentBook, page, idx);
         const img = document.createElement("img");
         img.className = "reader-page";
         if(idx < 3) img.src = imgUrl; // Load first 3 immediately
