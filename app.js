@@ -339,16 +339,29 @@ startReadBtn.addEventListener("click", () => {
         const imgUrl = getPageUrl(currentBook, page, idx);
         const img = document.createElement("img");
         img.className = "reader-page";
-        if(idx < 3) img.src = imgUrl; // Load first 3 immediately
-        else {
-            img.dataset.src = imgUrl;
-            img.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1.4'%3E%3C/svg%3E";
-            imgObserver.observe(img);
+        
+        // Fix layout shift (nhảy trang) bằng aspect-ratio
+        const w = page.width || page.w;
+        const h = page.height || page.h;
+        if (w && h) {
+            img.style.aspectRatio = `${w} / ${h}`;
         }
+
+        if (idx === 0) img.classList.add("active-page");
+
+        img.dataset.src = imgUrl;
+        // Placeholder mượt mà
+        img.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1.4'%3E%3C/svg%3E";
+        
+        imgObserver.observe(img);
         readerContent.appendChild(img);
     });
     readerContent.scrollTop = 0;
-    updateProgress();
+    
+    // Gọi updateProgress để xử lý class active và preload 7 trang đầu tiên
+    setTimeout(() => {
+        updateProgress();
+    }, 100);
 });
 
 backToDetailBtn.addEventListener("click", () => {
@@ -370,17 +383,58 @@ const imgObserver = new IntersectionObserver((entries) => {
     });
 }, { rootMargin: '500px 0px' });
 
-readerContent.addEventListener("scroll", updateProgress);
+readerContent.addEventListener("scroll", () => {
+    requestAnimationFrame(updateProgress);
+});
+
+function preloadPages(currentIdx) {
+    if (!currentBook) return;
+    const pages = readerContent.querySelectorAll(".reader-page");
+    
+    // Tải trước 7 trang tiếp theo từ trang hiện tại
+    const maxAhead = 7;
+    for (let i = 0; i <= currentIdx + maxAhead; i++) {
+        if (i < pages.length) {
+            const img = pages[i];
+            if (img.dataset.src) {
+                // Gán trực tiếp src, ảnh đã load sẽ nằm trong cache và không mất
+                img.src = img.dataset.src;
+                img.removeAttribute('data-src');
+                imgObserver.unobserve(img);
+            }
+        }
+    }
+}
 
 function updateProgress() {
     if(!currentBook) return;
     const pages = readerContent.querySelectorAll(".reader-page");
     let currentIdx = 0;
+    
+    // Tìm trang đang hiển thị
+    const viewportCenter = window.innerHeight / 2;
     for (let i = 0; i < pages.length; i++) {
-        if (pages[i].getBoundingClientRect().top <= window.innerHeight / 2) currentIdx = i;
-        else break;
+        const rect = pages[i].getBoundingClientRect();
+        if (rect.top <= viewportCenter + 100) {
+            currentIdx = i;
+        } else {
+            break;
+        }
     }
+    
+    // Cập nhật class active-page cho hiệu ứng mượt mà (zoom ra vào)
+    pages.forEach((p, idx) => {
+        if (idx === currentIdx) {
+            if (!p.classList.contains("active-page")) p.classList.add("active-page");
+        } else {
+            if (p.classList.contains("active-page")) p.classList.remove("active-page");
+        }
+    });
+
     readerProgress.textContent = `${currentIdx + 1} / ${currentBook.num_pages}`;
+    
+    // Tải trước 7 trang
+    preloadPages(currentIdx);
 }
 
 // === PULL TO REFRESH & SMART HEADER ===
