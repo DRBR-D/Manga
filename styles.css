@@ -545,6 +545,19 @@ section {
     max-width: 800px;
     width: 100%;
     display: block;
+    margin: 0 auto 2rem;
+    opacity: 0.3;
+    transform: scale(0.95);
+    transition: transform 0.5s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.5s ease-out;
+    border-radius: 8px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.5);
+    background-color: #1a1a1a;
+}
+
+.reader-page.active-page {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 10px 40px rgba(212, 175, 55, 0.15);
 }
 
 /* Footer */
