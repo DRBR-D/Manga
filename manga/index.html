@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Manga - Premium Reader</title>
+    <meta name="description" content="Trải nghiệm đọc manga đỉnh cao.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Top Navigation -->
+        <header class="top-nav">
+            <div class="nav-content">
+                <div class="logo" id="logo" onclick="app.goHome()">
+                    <span class="logo-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                        </svg>
+                    </span>
+                    <span class="logo-text">MANGA</span>
+                </div>
+                
+                <div class="desktop-menu">
+                    <a href="#" class="active" onclick="app.goHome()">Trang chủ</a>
+                    <a href="#" onclick="app.showPopular()">Phổ biến</a>
+                    <a href="../index.html">Chuyển sang Movies</a>
+                </div>
+
+                <div class="nav-actions">
+                    <div class="search-btn" id="searchBtn" onclick="app.toggleSearch()">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                    </div>
+                    <div class="avatar desktop-only">
+                        <img src="https://ui-avatars.com/api/?name=User&background=ED2553&color=fff" alt="Avatar">
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Search Overlay -->
+        <div class="search-overlay" id="searchOverlay">
+            <div class="search-container">
+                <input type="text" id="searchInput" placeholder="Tìm kiếm manga..." autocomplete="off">
+                <button class="close-search" onclick="app.toggleSearch()">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="search-results-container" id="searchResults"></div>
+        </div>
+
+        <!-- Main Content Area -->
+        <main id="main-content">
+            <div class="global-loader">
+                <div class="spinner"></div>
+            </div>
+        </main>
+        
+        <!-- Bottom Tab Bar (Mobile Only) -->
+        <nav class="bottom-tab-bar">
+            <div class="tab-item active" onclick="app.goHome()">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                    <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                </svg>
+                <span>Trang chủ</span>
+            </div>
+            <div class="tab-item" onclick="app.showPopular()">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
+                </svg>
+                <span>Phổ biến</span>
+            </div>
+            <a href="../index.html" class="tab-item" style="text-decoration:none;">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="2" y1="12" x2="22" y2="12"></line>
+                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                </svg>
+                <span>Portal</span>
+            </a>
+        </nav>
+    </div>
+
+    <!-- External Script -->
+    <script src="./app.js"></script>
+</body>
+</html>
