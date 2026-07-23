@@ -1,18 +1,16 @@
 /**
- * nHentai Web Reader — Hybrid Web Application
- * Compatible with Cloudflare Pages (dash.cloudflare.com), GitHub Pages, and Local Hosting
- * Based on nhentai-api-docs.md specification
+ * nHentai Web Reader — Pure Root Web Application
+ * Flat Directory Structure (All files in root - No subfolders needed)
  */
 
-// CDN Domain Configs (Deterministic hash algorithm as in md)
 const IMG_SERVERS = ["i1.nhentai.net", "i2.nhentai.net", "i3.nhentai.net"];
 const THUMB_SERVERS = ["t1.nhentai.net", "t2.nhentai.net", "t3.nhentai.net", "t4.nhentai.net"];
 const IMG_EXT_MAP = { j: "jpg", p: "png", g: "gif", w: "webp" };
 
-// Global State
+// Global Application State
 const state = {
   activeView: 'listing',
-  listingType: 'home', // 'home', 'search', 'tag', 'popular', 'favs', 'history'
+  listingType: 'home',
   query: '',
   tagId: null,
   tagName: '',
@@ -23,8 +21,8 @@ const state = {
   reader: {
     book: null,
     pageIndex: 0,
-    mode: 'single', // 'single' | 'continuous'
-    fitMode: 'fit-height' // 'fit-height' | 'fit-width' | 'fit-original'
+    mode: 'single',
+    fitMode: 'fit-height'
   },
   favorites: JSON.parse(localStorage.getItem('nh_favorites') || '{}'),
   history: JSON.parse(localStorage.getItem('nh_history') || '{}')
@@ -59,58 +57,52 @@ function buildGalleryThumbUrl(mediaId) {
 }
 
 /**
- * Universal Smart API Fetcher
- * Strategy:
- * 1. Relative `/api/` (Works automatically on Cloudflare Pages via Functions & Local Server)
- * 2. Direct `https://nhentai.net/api/v2/`
- * 3. Public CORS Proxies (allorigins, corsproxy, etc. for GitHub Pages)
+ * Universal API Fetcher with Auto Failover
  */
 async function fetchApi(endpoint, params = {}) {
   const cleanParams = { ...params };
-  if (cleanParams.sort === 'recent') delete cleanParams.sort; // Prevent 400 Bad Request on v2 search
+  if (cleanParams.sort === 'recent') delete cleanParams.sort;
 
   const queryString = new URLSearchParams(cleanParams).toString();
-  const relUrl = `/api/${endpoint}${queryString ? '?' + queryString : ''}`;
-  const directUrl = `https://nhentai.net/api/v2/${endpoint}${queryString ? '?' + queryString : ''}`;
+  const directTarget = `https://nhentai.net/api/v2/${endpoint}${queryString ? '?' + queryString : ''}`;
 
-  // Candidates array in order of preference
   const candidates = [
-    relUrl, // Cloudflare Pages Function or Local Express Proxy
-    directUrl, // Direct API fetch
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(directUrl)}`,
-    `https://corsproxy.io/?${encodeURIComponent(directUrl)}`,
-    `https://cors.eu.org/${directUrl}`
+    directTarget,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(directTarget)}`,
+    `https://corsproxy.io/?${encodeURIComponent(directTarget)}`,
+    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(directTarget)}`
   ];
 
-  let lastError = null;
+  let lastErr = null;
 
   for (const url of candidates) {
     try {
       const res = await fetch(url);
       if (res.ok) {
-        const data = await res.json();
-        if (data && !data.error) {
-          return data;
-        }
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.includes('text/html')) continue;
+        const text = await res.text();
+        if (text.trim().startsWith('<')) continue;
+        const data = JSON.parse(text);
+        if (data && !data.error) return data;
       }
     } catch (err) {
-      lastError = err;
+      lastErr = err;
     }
   }
 
-  throw new Error(lastError ? lastError.message : 'Không thể kết nối nHentai API. Hãy kiểm tra lại mạng hoặc thử chọn server khác.');
+  throw new Error(lastErr ? lastErr.message : 'Không thể kết nối nHentai API do trình duyệt hoặc mạng chặn.');
 }
 
-// Application Initialization
+// App Initialization
 document.addEventListener('DOMContentLoaded', () => {
   setupEventListeners();
   updateFavBadge();
   loadHomepage();
 });
 
-// Event Listeners
 function setupEventListeners() {
-  document.getElementById('brand-logo').addEventListener('click', () => {
+  document.getElementById('brand-logo')?.addEventListener('click', () => {
     state.listingType = 'home';
     state.query = '';
     state.tagId = null;
@@ -118,120 +110,71 @@ function setupEventListeners() {
     loadHomepage();
   });
 
-  document.getElementById('search-form').addEventListener('submit', (e) => {
+  document.getElementById('search-form')?.addEventListener('submit', (e) => {
     e.preventDefault();
-    const query = document.getElementById('search-input').value.trim();
+    const input = document.getElementById('search-input');
+    const query = input ? input.value.trim() : '';
     if (!query) return;
     state.listingType = 'search';
     state.query = query;
     state.tagId = null;
-    state.sort = document.getElementById('sort-select').value;
+    const sortSel = document.getElementById('sort-select');
+    state.sort = sortSel ? sortSel.value : 'recent';
     state.page = 1;
     loadListing();
   });
 
-  document.getElementById('sort-select').addEventListener('change', () => {
-    if (state.listingType === 'search' || state.listingType === 'tag') {
-      state.sort = document.getElementById('sort-select').value;
-      state.page = 1;
-      loadListing();
-    }
-  });
-
-  document.getElementById('jump-id-btn').addEventListener('click', jumpToId);
-  document.getElementById('jump-id-input').addEventListener('keydown', (e) => {
+  document.getElementById('jump-id-btn')?.addEventListener('click', jumpToId);
+  document.getElementById('jump-id-input')?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') jumpToId();
   });
 
-  document.getElementById('nav-home').addEventListener('click', () => {
-    setActiveNav('nav-home');
-    state.listingType = 'home';
-    state.page = 1;
-    loadHomepage();
-  });
+  // Navigation Buttons
+  setupNavBtn('nav-home', 'home', loadHomepage);
+  setupNavBtn('nav-popular', 'popular', loadPopularSectionOnly);
+  setupNavBtn('nav-random-top', null, fetchRandomBook);
+  setupNavBtn('nav-favs', 'favs', renderFavsView);
+  setupNavBtn('nav-history', 'history', renderHistoryView);
 
-  document.getElementById('nav-popular').addEventListener('click', () => {
-    setActiveNav('nav-popular');
-    state.listingType = 'popular';
-    loadPopularSectionOnly();
-  });
-
-  document.getElementById('nav-random').addEventListener('click', fetchRandomBook);
-
-  document.getElementById('nav-favs').addEventListener('click', () => {
-    setActiveNav('nav-favs');
-    state.listingType = 'favs';
-    renderFavsView();
-  });
-
-  document.getElementById('nav-history').addEventListener('click', () => {
-    setActiveNav('nav-history');
-    state.listingType = 'history';
-    renderHistoryView();
-  });
-
-  document.getElementById('pg-first').addEventListener('click', () => changePage(1));
-  document.getElementById('pg-prev').addEventListener('click', () => changePage(state.page - 1));
-  document.getElementById('pg-next').addEventListener('click', () => changePage(state.page + 1));
-  document.getElementById('pg-last').addEventListener('click', () => changePage(state.maxPages));
-  document.getElementById('pg-input').addEventListener('change', (e) => {
+  // Pagination
+  document.getElementById('pg-prev')?.addEventListener('click', () => changePage(state.page - 1));
+  document.getElementById('pg-next')?.addEventListener('click', () => changePage(state.page + 1));
+  document.getElementById('pg-input')?.addEventListener('change', (e) => {
     let p = parseInt(e.target.value, 10);
     if (isNaN(p)) return;
     p = Math.max(1, Math.min(p, state.maxPages));
     changePage(p);
   });
 
-  document.getElementById('details-back-btn').addEventListener('click', () => {
-    switchView('listing');
-  });
+  // Details & Reader Actions
+  document.getElementById('details-back-btn')?.addEventListener('click', () => switchView('listing'));
+  document.getElementById('btn-start-reading')?.addEventListener('click', () => { if (state.currentBook) openReader(state.currentBook, 0); });
+  document.getElementById('btn-toggle-fav')?.addEventListener('click', () => { if (state.currentBook) toggleFavorite(state.currentBook); });
+  document.getElementById('reader-close-btn')?.addEventListener('click', closeReader);
 
-  document.getElementById('btn-start-reading').addEventListener('click', () => {
-    if (state.currentBook) openReader(state.currentBook, 0);
-  });
-
-  document.getElementById('btn-toggle-fav').addEventListener('click', () => {
-    if (state.currentBook) toggleFavorite(state.currentBook);
-  });
-
-  document.getElementById('btn-random-detail').addEventListener('click', fetchRandomBook);
-
-  document.getElementById('reader-close-btn').addEventListener('click', closeReader);
-
-  document.getElementById('reader-mode-select').addEventListener('change', (e) => {
+  document.getElementById('reader-mode-select')?.addEventListener('change', (e) => {
     state.reader.mode = e.target.value;
     renderReaderStage();
   });
 
-  document.getElementById('btn-prev-page').addEventListener('click', () => stepReaderPage(-1));
-  document.getElementById('btn-next-page').addEventListener('click', () => stepReaderPage(1));
-
-  document.getElementById('reader-page-input').addEventListener('change', (e) => {
-    const val = parseInt(e.target.value, 10);
-    if (!isNaN(val) && state.reader.book) {
-      setReaderPage(val - 1);
-    }
-  });
-
-  document.getElementById('btn-toggle-fit').addEventListener('click', () => {
-    const modes = ['fit-height', 'fit-width', 'fit-original'];
-    const currentIdx = modes.indexOf(state.reader.fitMode);
-    state.reader.fitMode = modes[(currentIdx + 1) % modes.length];
-    updateReaderFitClass();
-    showToast(`Kích thước: ${state.reader.fitMode}`);
-  });
-
-  document.getElementById('btn-fullscreen').addEventListener('click', toggleFullscreen);
-
-  document.getElementById('zone-prev').addEventListener('click', () => stepReaderPage(-1));
-  document.getElementById('zone-next').addEventListener('click', () => stepReaderPage(1));
+  document.getElementById('btn-prev-page')?.addEventListener('click', () => stepReaderPage(-1));
+  document.getElementById('btn-next-page')?.addEventListener('click', () => stepReaderPage(1));
+  document.getElementById('zone-prev')?.addEventListener('click', () => stepReaderPage(-1));
+  document.getElementById('zone-next')?.addEventListener('click', () => stepReaderPage(1));
 
   document.addEventListener('keydown', handleGlobalKeyDown);
 }
 
-function setActiveNav(navId) {
-  document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
-  const target = document.getElementById(navId);
-  if (target) target.classList.add('active');
+function setupNavBtn(id, listingType, callback) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('click', () => {
+    if (listingType) {
+      state.listingType = listingType;
+      state.page = 1;
+    }
+    callback();
+  });
 }
 
 function switchView(viewName) {
@@ -241,13 +184,14 @@ function switchView(viewName) {
   if (activeSec) activeSec.classList.add('active');
 }
 
-// Data Fetching: Homepage
+// Data Loading: Homepage
 async function loadHomepage() {
   switchView('listing');
-  setActiveNav('nav-home');
-  document.getElementById('popular-banner').classList.remove('hidden');
-  document.getElementById('active-filter-badge').classList.add('hidden');
-  document.getElementById('listing-title').textContent = '📖 Galleries Mới Nhất';
+  const popBanner = document.getElementById('popular-banner');
+  if (popBanner) popBanner.classList.remove('hidden');
+
+  const titleEl = document.getElementById('listing-title');
+  if (titleEl) titleEl.textContent = '📖 Galleries Mới Nhất';
 
   showLoader(true);
   try {
@@ -261,55 +205,55 @@ async function loadHomepage() {
     state.maxPages = homeData.num_pages || 1;
     updatePaginationUI();
   } catch (err) {
-    showToast(`Lỗi tải trang chủ: ${err.message}`);
+    renderErrorCard(err.message);
   } finally {
     showLoader(false);
   }
 }
 
-// Data Fetching: Popular Section Only
 async function loadPopularSectionOnly() {
   switchView('listing');
-  document.getElementById('popular-banner').classList.add('hidden');
-  document.getElementById('active-filter-badge').classList.remove('hidden');
-  document.getElementById('active-filter-badge').textContent = '🔥 Hot Popular';
-  document.getElementById('listing-title').textContent = '🔥 Galleries Phổ Biến';
+  const popBanner = document.getElementById('popular-banner');
+  if (popBanner) popBanner.classList.add('hidden');
+
+  const titleEl = document.getElementById('listing-title');
+  if (titleEl) titleEl.textContent = '🔥 Galleries Phổ Biến';
 
   showLoader(true);
   try {
     const popularData = await fetchApi('galleries/popular');
     renderGalleryGrid(popularData || []);
-    document.getElementById('pagination').style.display = 'none';
+    const pg = document.getElementById('pagination');
+    if (pg) pg.style.display = 'none';
   } catch (err) {
-    showToast(`Lỗi tải phổ biến: ${err.message}`);
+    renderErrorCard(err.message);
   } finally {
     showLoader(false);
   }
 }
 
-// Data Fetching: Search & Tag Filter
 async function loadListing() {
   switchView('listing');
-  document.getElementById('popular-banner').classList.add('hidden');
-  document.getElementById('pagination').style.display = 'flex';
+  const popBanner = document.getElementById('popular-banner');
+  if (popBanner) popBanner.classList.add('hidden');
 
-  const filterBadge = document.getElementById('active-filter-badge');
-  filterBadge.classList.remove('hidden');
+  const pg = document.getElementById('pagination');
+  if (pg) pg.style.display = 'flex';
 
   showLoader(true);
   try {
     let data;
     if (state.listingType === 'search') {
-      filterBadge.textContent = `Từ khóa: "${state.query}"`;
-      document.getElementById('listing-title').textContent = '🔍 Kết Quả Tìm Kiếm';
+      const titleEl = document.getElementById('listing-title');
+      if (titleEl) titleEl.textContent = `🔍 Từ khóa: "${state.query}"`;
       data = await fetchApi('search', {
         query: state.query,
         page: state.page,
         sort: state.sort
       });
     } else if (state.listingType === 'tag') {
-      filterBadge.textContent = `Tag: ${state.tagName || ('ID ' + state.tagId)}`;
-      document.getElementById('listing-title').textContent = '🏷️ Danh Sách Theo Tag';
+      const titleEl = document.getElementById('listing-title');
+      if (titleEl) titleEl.textContent = `🏷️ Tag: ${state.tagName || ('ID ' + state.tagId)}`;
       data = await fetchApi('galleries/tagged', {
         tag_id: state.tagId,
         page: state.page,
@@ -321,7 +265,7 @@ async function loadListing() {
     state.maxPages = data.num_pages || 1;
     updatePaginationUI();
   } catch (err) {
-    showToast(`Lỗi tìm kiếm: ${err.message}`);
+    renderErrorCard(err.message);
   } finally {
     showLoader(false);
   }
@@ -329,6 +273,7 @@ async function loadListing() {
 
 async function jumpToId() {
   const input = document.getElementById('jump-id-input');
+  if (!input) return;
   const bookId = parseInt(input.value.trim(), 10);
   if (!bookId || isNaN(bookId)) {
     showToast('Vui lòng nhập ID hợp lệ');
@@ -351,10 +296,11 @@ async function fetchRandomBook() {
 
 function renderGalleryGrid(galleries) {
   const grid = document.getElementById('gallery-grid');
+  if (!grid) return;
   grid.innerHTML = '';
 
   if (!galleries || galleries.length === 0) {
-    grid.innerHTML = '<p class="no-data">Không tìm thấy gallery nào.</p>';
+    grid.innerHTML = '<p style="grid-column:1/-1;text-align:center;padding:40px;color:var(--ios-text-sub);">Không tìm thấy gallery nào.</p>';
     return;
   }
 
@@ -366,6 +312,7 @@ function renderGalleryGrid(galleries) {
 
 function renderPopularBanner(popularGalleries) {
   const bannerGrid = document.getElementById('popular-grid');
+  if (!bannerGrid) return;
   bannerGrid.innerHTML = '';
 
   if (!popularGalleries || popularGalleries.length === 0) return;
@@ -389,9 +336,9 @@ function createGalleryCard(item) {
   card.className = 'gallery-card';
   card.innerHTML = `
     <div class="card-thumb-container">
-      <img src="${thumbUrl}" alt="${titleText}" class="card-thumb-img" loading="lazy" referrerpolicy="no-referrer" onerror="this.src='https://via.placeholder.com/250x350/1e212d/ffffff?text=No+Cover'">
+      <img src="${thumbUrl}" alt="${titleText}" class="card-thumb-img" loading="lazy" referrerpolicy="no-referrer" onerror="this.src='https://via.placeholder.com/250x350/1c1c1e/ffffff?text=No+Cover'">
       <span class="card-pages-badge">${item.num_pages}P</span>
-      <button class="card-fav-btn ${isFav ? 'active' : ''}" title="Thêm vào yêu thích">♥</button>
+      <button class="card-fav-btn ${isFav ? 'active' : ''}" title="Yêu thích">♥</button>
     </div>
     <div class="card-info">
       <div class="card-title" title="${titleText}">${titleText}</div>
@@ -408,12 +355,44 @@ function createGalleryCard(item) {
   });
 
   const favBtn = card.querySelector('.card-fav-btn');
-  favBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    toggleFavorite(item, favBtn);
-  });
+  if (favBtn) {
+    favBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleFavorite(item, favBtn);
+    });
+  }
 
   return card;
+}
+
+function renderErrorCard(errMsg) {
+  const grid = document.getElementById('gallery-grid');
+  if (!grid) return;
+
+  grid.innerHTML = `
+    <div style="grid-column: 1/-1; background: #1c1c1e; border-radius: 16px; padding: 32px 20px; text-align: center; max-width: 600px; margin: 20px auto; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
+      <h3 style="color: #ff453a; margin-bottom: 12px; font-size: 1.2rem;">⚠️ Không Thể Tải Dữ Liệu nHentai API</h3>
+      <p style="color: #8e8e93; font-size: 0.9rem; margin-bottom: 20px; line-height: 1.5;">
+        ${errMsg || 'Trình duyệt bị chặn CORS hoặc kết nối bị từ chối do nhà mạng.'}
+      </p>
+      
+      <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 20px;">
+        <button id="btn-retry-fetch" class="btn btn-primary" style="padding: 10px 20px; border-radius: 10px;">🔄 Thử lại ngay</button>
+      </div>
+
+      <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 16px; font-size: 0.85rem; color: #8e8e93;">
+        💡 <strong>Mẹo:</strong> Bạn có thể nhập trực tiếp ID truyện vào ô tìm kiếm ID (vd: <code>660253</code>) ở góc trên để mở đọc ngay.
+      </div>
+    </div>
+  `;
+
+  const retryBtn = document.getElementById('btn-retry-fetch');
+  if (retryBtn) {
+    retryBtn.addEventListener('click', () => {
+      if (state.listingType === 'home') loadHomepage();
+      else loadListing();
+    });
+  }
 }
 
 async function loadBookDetails(bookId) {
@@ -442,22 +421,35 @@ function renderDetailsView(book) {
   const coverType = book.cover ? book.cover.t : 'j';
   const coverUrl = buildCoverUrl(mediaId, coverType);
 
-  document.getElementById('details-cover').src = coverUrl;
-  document.getElementById('details-title-pretty').textContent = book.title?.pretty || book.title?.english || `Gallery #${book.id}`;
-  document.getElementById('details-title-english').textContent = book.title?.english || '';
-  document.getElementById('details-title-japanese').textContent = book.title?.japanese || '';
+  const coverImg = document.getElementById('details-cover');
+  if (coverImg) coverImg.src = coverUrl;
 
-  document.getElementById('details-pages-count').textContent = book.num_pages;
-  document.getElementById('details-favs-count').textContent = book.num_favorites;
-  document.getElementById('details-id').textContent = book.id;
+  const tPretty = document.getElementById('details-title-pretty');
+  if (tPretty) tPretty.textContent = book.title?.pretty || book.title?.english || `Gallery #${book.id}`;
 
-  const dateStr = book.upload_date ? new Date(book.upload_date * 1000).toLocaleDateString('vi-VN') : 'N/A';
-  document.getElementById('details-upload-date').textContent = dateStr;
+  const tEng = document.getElementById('details-title-english');
+  if (tEng) tEng.textContent = book.title?.english || '';
+
+  const tJap = document.getElementById('details-title-japanese');
+  if (tJap) tJap.textContent = book.title?.japanese || '';
+
+  const dPages = document.getElementById('details-pages-count');
+  if (dPages) dPages.textContent = book.num_pages;
+
+  const dFavs = document.getElementById('details-favs-count');
+  if (dFavs) dFavs.textContent = book.num_favorites;
+
+  const dId = document.getElementById('details-id');
+  if (dId) dId.textContent = book.id;
+
+  const dDate = document.getElementById('details-upload-date');
+  if (dDate) dDate.textContent = book.upload_date ? new Date(book.upload_date * 1000).toLocaleDateString('vi-VN') : 'N/A';
 
   const isFav = !!state.favorites[book.id];
   const favBtn = document.getElementById('btn-toggle-fav');
-  favBtn.textContent = isFav ? '💔 Bỏ Yêu Thích' : '💖 Thêm Vào Yêu Thích';
-  favBtn.className = isFav ? 'btn btn-outline btn-lg active' : 'btn btn-outline btn-lg';
+  if (favBtn) {
+    favBtn.textContent = isFav ? '💔 Bỏ Yêu Thích' : '💖 Thêm Vào Yêu Thích';
+  }
 
   renderDetailsTags(book.tags || []);
   renderDetailsThumbnails(book);
@@ -465,6 +457,7 @@ function renderDetailsView(book) {
 
 function renderDetailsTags(tags) {
   const container = document.getElementById('details-tags-list');
+  if (!container) return;
   container.innerHTML = '';
 
   const groups = {};
@@ -510,8 +503,11 @@ function renderDetailsTags(tags) {
 
 function renderDetailsThumbnails(book) {
   const grid = document.getElementById('pages-thumb-grid');
+  if (!grid) return;
   grid.innerHTML = '';
-  document.getElementById('thumb-count').textContent = book.pages ? book.pages.length : 0;
+
+  const tCount = document.getElementById('thumb-count');
+  if (tCount) tCount.textContent = book.pages ? book.pages.length : 0;
 
   if (!book.pages) return;
 
@@ -527,16 +523,14 @@ function renderDetailsThumbnails(book) {
       <div class="page-thumb-num">${pageNum}</div>
     `;
 
-    card.addEventListener('click', () => {
-      openReader(book, idx);
-    });
-
+    card.addEventListener('click', () => openReader(book, idx));
     grid.appendChild(card);
   });
 }
 
 function renderRelatedSection(relatedList) {
   const grid = document.getElementById('related-grid');
+  if (!grid) return;
   grid.innerHTML = '';
   if (!relatedList || relatedList.length === 0) {
     grid.innerHTML = '<p class="no-data">Không có đề xuất.</p>';
@@ -554,8 +548,11 @@ function openReader(book, startIndex = 0) {
   state.reader.book = book;
   state.reader.pageIndex = Math.max(0, Math.min(startIndex, book.pages.length - 1));
 
-  document.getElementById('reader-book-title').textContent = book.title?.pretty || book.title?.english || `Gallery #${book.id}`;
-  document.getElementById('reader-total-pages').textContent = book.pages.length;
+  const titleEl = document.getElementById('reader-book-title');
+  if (titleEl) titleEl.textContent = book.title?.pretty || book.title?.english || `Gallery #${book.id}`;
+
+  const totalEl = document.getElementById('reader-total-pages');
+  if (totalEl) totalEl.textContent = book.pages.length;
 
   switchView('reader');
   renderReaderStage();
@@ -574,14 +571,16 @@ function renderReaderStage() {
   const continuousContainer = document.getElementById('continuous-reader-container');
 
   if (mode === 'single') {
-    singleContainer.classList.remove('hidden');
-    continuousContainer.classList.add('hidden');
-    document.getElementById('reader-page-nav').classList.remove('hidden');
+    if (singleContainer) singleContainer.classList.remove('hidden');
+    if (continuousContainer) continuousContainer.classList.add('hidden');
+    const pNav = document.getElementById('reader-page-nav');
+    if (pNav) pNav.classList.remove('hidden');
     updateSinglePage();
   } else {
-    singleContainer.classList.add('hidden');
-    continuousContainer.classList.remove('hidden');
-    document.getElementById('reader-page-nav').classList.add('hidden');
+    if (singleContainer) singleContainer.classList.add('hidden');
+    if (continuousContainer) continuousContainer.classList.remove('hidden');
+    const pNav = document.getElementById('reader-page-nav');
+    if (pNav) pNav.classList.add('hidden');
     renderContinuousPages();
   }
 }
@@ -598,23 +597,25 @@ function updateSinglePage() {
   const imgEl = document.getElementById('reader-current-img');
   const loaderEl = document.getElementById('reader-img-loader');
 
-  loaderEl.classList.remove('hidden');
-  imgEl.style.opacity = '0.3';
+  if (loaderEl) loaderEl.classList.remove('hidden');
+  if (imgEl) {
+    imgEl.style.opacity = '0.3';
+    imgEl.onload = () => {
+      if (loaderEl) loaderEl.classList.add('hidden');
+      imgEl.style.opacity = '1';
+    };
+    imgEl.onerror = () => {
+      if (loaderEl) loaderEl.classList.add('hidden');
+      imgEl.style.opacity = '1';
+      showToast(`Không thể tải trang ${idx + 1}. Thử lại...`);
+    };
+    imgEl.src = imgUrl;
+  }
 
-  imgEl.onload = () => {
-    loaderEl.classList.add('hidden');
-    imgEl.style.opacity = '1';
-  };
-  imgEl.onerror = () => {
-    loaderEl.classList.add('hidden');
-    imgEl.style.opacity = '1';
-    showToast(`Không thể tải trang ${idx + 1}. Thử lại...`);
-  };
-
-  imgEl.src = imgUrl;
   updateReaderFitClass();
 
-  document.getElementById('reader-page-input').value = idx + 1;
+  const pInput = document.getElementById('reader-page-input');
+  if (pInput) pInput.value = idx + 1;
 
   preloadNextPages(idx + 1, 2);
   saveHistory(book, idx + 1);
@@ -622,7 +623,7 @@ function updateSinglePage() {
 
 function updateReaderFitClass() {
   const imgEl = document.getElementById('reader-current-img');
-  imgEl.className = `reader-main-img ${state.reader.fitMode}`;
+  if (imgEl) imgEl.className = `reader-main-img ${state.reader.fitMode}`;
 }
 
 function stepReaderPage(delta) {
@@ -660,6 +661,7 @@ function preloadNextPages(startIndex, count) {
 
 function renderContinuousPages() {
   const container = document.getElementById('continuous-pages-list');
+  if (!container) return;
   container.innerHTML = '';
   const book = state.reader.book;
   if (!book || !book.pages) return;
@@ -689,17 +691,7 @@ function handleGlobalKeyDown(e) {
       stepReaderPage(1);
     } else if (e.key === 'Escape') {
       closeReader();
-    } else if (e.code === 'KeyF') {
-      toggleFullscreen();
     }
-  }
-}
-
-function toggleFullscreen() {
-  if (!document.fullscreenElement) {
-    document.documentElement.requestFullscreen().catch(() => {});
-  } else {
-    document.exitFullscreen().catch(() => {});
   }
 }
 
@@ -727,31 +719,32 @@ function toggleFavorite(book, btnEl = null) {
   localStorage.setItem('nh_favorites', JSON.stringify(state.favorites));
   updateFavBadge();
 
-  if (btnEl) {
-    btnEl.classList.toggle('active', !isFav);
-  }
+  if (btnEl) btnEl.classList.toggle('active', !isFav);
 
   if (state.currentBook && state.currentBook.id === id) {
     const detailFavBtn = document.getElementById('btn-toggle-fav');
     if (detailFavBtn) {
       detailFavBtn.textContent = !isFav ? '💔 Bỏ Yêu Thích' : '💖 Thêm Vào Yêu Thích';
-      detailFavBtn.className = !isFav ? 'btn btn-outline btn-lg active' : 'btn btn-outline btn-lg';
     }
   }
 }
 
 function updateFavBadge() {
   const count = Object.keys(state.favorites).length;
-  document.getElementById('fav-count-badge').textContent = count;
+  const badge = document.getElementById('fav-count-badge');
+  if (badge) badge.textContent = count;
 }
 
 function renderFavsView() {
   switchView('listing');
-  document.getElementById('popular-banner').classList.add('hidden');
-  document.getElementById('pagination').style.display = 'none';
-  document.getElementById('active-filter-badge').classList.remove('hidden');
-  document.getElementById('active-filter-badge').textContent = `Tổng: ${Object.keys(state.favorites).length} truyện`;
-  document.getElementById('listing-title').textContent = '💖 Danh Sách Yêu Thích';
+  const popBanner = document.getElementById('popular-banner');
+  if (popBanner) popBanner.classList.add('hidden');
+
+  const titleEl = document.getElementById('listing-title');
+  if (titleEl) titleEl.textContent = '💖 Danh Sách Yêu Thích';
+
+  const pg = document.getElementById('pagination');
+  if (pg) pg.style.display = 'none';
 
   const favList = Object.values(state.favorites);
   renderGalleryGrid(favList);
@@ -773,11 +766,14 @@ function saveHistory(book, lastPage = 1) {
 
 function renderHistoryView() {
   switchView('listing');
-  document.getElementById('popular-banner').classList.add('hidden');
-  document.getElementById('pagination').style.display = 'none';
-  document.getElementById('active-filter-badge').classList.remove('hidden');
-  document.getElementById('active-filter-badge').textContent = `Đã đọc: ${Object.keys(state.history).length} truyện`;
-  document.getElementById('listing-title').textContent = '📜 Lịch Sử Đọc Truyện';
+  const popBanner = document.getElementById('popular-banner');
+  if (popBanner) popBanner.classList.remove('hidden');
+
+  const titleEl = document.getElementById('listing-title');
+  if (titleEl) titleEl.textContent = '📜 Lịch Sử Đọc Truyện';
+
+  const pg = document.getElementById('pagination');
+  if (pg) pg.style.display = 'none';
 
   const historyList = Object.values(state.history).sort((a, b) => b.updatedAt - a.updatedAt);
   renderGalleryGrid(historyList);
@@ -785,23 +781,25 @@ function renderHistoryView() {
 
 function changePage(newPage) {
   state.page = newPage;
-  if (state.listingType === 'home') {
-    loadHomepage();
-  } else {
-    loadListing();
-  }
+  if (state.listingType === 'home') loadHomepage();
+  else loadListing();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function updatePaginationUI() {
-  document.getElementById('pg-input').value = state.page;
-  document.getElementById('pg-max').textContent = state.maxPages;
+  const pgInput = document.getElementById('pg-input');
+  if (pgInput) pgInput.value = state.page;
+
+  const pgMax = document.getElementById('pg-max');
+  if (pgMax) pgMax.textContent = state.maxPages;
 }
 
 function showLoader(visible) {
   const loader = document.getElementById('listing-loader');
-  if (visible) loader.classList.remove('hidden');
-  else loader.classList.add('hidden');
+  if (loader) {
+    if (visible) loader.classList.remove('hidden');
+    else loader.classList.add('hidden');
+  }
 }
 
 function formatCount(num) {
@@ -812,6 +810,7 @@ function formatCount(num) {
 
 function showToast(msg) {
   const container = document.getElementById('toast-container');
+  if (!container) return;
   const toast = document.createElement('div');
   toast.className = 'toast';
   toast.textContent = msg;
