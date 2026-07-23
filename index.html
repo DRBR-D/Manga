@@ -2,9 +2,9 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
   <meta name="referrer" content="no-referrer">
-  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#000000">
   <title>nHentai Reader</title>
@@ -15,39 +15,23 @@
 </head>
 <body>
 
-  <!-- ═══════════════════════════════════════════════════════════════════
-       iOS Navigation Bar (Top)
-       ═══════════════════════════════════════════════════════════════════ -->
-  <header class="ios-nav-bar" id="ios-nav-bar">
-    <div class="ios-nav-content">
-      <div class="ios-nav-leading">
-        <div class="ios-brand-badge" id="brand-logo" role="button" aria-label="Trang chủ">
-          <div class="ios-brand-icon">nH</div>
-          <span class="ios-brand-text">nHentai</span>
-        </div>
-      </div>
-      <div class="ios-nav-trailing">
-        <button class="ios-btn-icon" id="btn-random-top" title="Ngẫu nhiên" aria-label="Truyện ngẫu nhiên">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <polyline points="18 8 22 4 18 1"/>
-            <polyline points="22 4 14 4"/>
-            <polyline points="6 2 2 6 6 10"/>
-            <polyline points="2 6 10 6"/>
-          </svg>
-        </button>
-      </div>
+  <!-- ═══ TOP NAV ═══ -->
+  <header class="top-nav">
+    <div class="top-nav-inner">
+      <button class="nav-brand" id="brand-logo" aria-label="Trang chủ">
+        <span class="nav-brand-icon">nH</span>
+        <span class="nav-brand-text">nHentai</span>
+      </button>
     </div>
 
-    <!-- iOS Search Bar -->
-    <div class="ios-search-bar" id="search-bar">
-      <form class="ios-search-field" id="search-form" role="search" aria-label="Tìm kiếm">
-        <svg class="ios-search-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5">
-          <circle cx="11" cy="11" r="8"></circle>
-          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+    <!-- Search -->
+    <div class="search-wrap">
+      <form class="search-field" id="search-form" role="search">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.5">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
-        <input type="text" id="search-input" class="ios-search-input" placeholder="Tìm kiếm" autocomplete="off" enterkeyhint="search">
-        <button type="button" class="ios-search-clear" id="search-clear-btn" aria-label="Xóa tìm kiếm">✕</button>
-        <select id="sort-select" class="ios-search-sort" aria-label="Sắp xếp">
+        <input type="text" id="search-input" placeholder="Tìm kiếm" autocomplete="off" enterkeyhint="search">
+        <select id="sort-select">
           <option value="recent">Mới nhất</option>
           <option value="popular">Phổ biến</option>
           <option value="popular-week">Hot tuần</option>
@@ -56,218 +40,176 @@
       </form>
     </div>
 
-    <!-- ID Jumper (compact, inline) -->
-    <div style="display:flex;align-items:center;gap:8px;padding:0 16px 8px;">
-      <input type="number" id="jump-id-input" placeholder="Nhập ID..." min="1"
-             style="flex:1;height:32px;background:var(--ios-fill-secondary);border:0.5px solid var(--ios-separator);border-radius:8px;color:var(--ios-text-primary);padding:0 10px;font-size:14px;outline:none;">
-      <button id="jump-id-btn" class="ios-btn ios-btn-secondary" style="padding:4px 14px;font-size:13px;min-height:32px;">Đến</button>
+    <!-- Nav row -->
+    <div class="nav-row">
+      <button class="nav-btn active" id="nav-home">Trang Chủ</button>
+      <button class="nav-btn" id="nav-popular">Hot</button>
+      <button class="nav-btn accent" id="nav-random-top">Ngẫu Nhiên</button>
+      <button class="nav-btn" id="nav-favs">Yêu Thích</button>
+      <button class="nav-btn" id="nav-history">Lịch Sử</button>
+    </div>
+
+    <!-- ID Jumper -->
+    <div class="jumper-row">
+      <input type="number" id="jump-id-input" placeholder="Nhập ID gallery..." min="1">
+      <button id="jump-id-btn" class="btn btn-pri" style="font-size:.8125rem;padding:5px 14px;min-height:32px;">Đến</button>
     </div>
   </header>
 
-  <!-- ═══════════════════════════════════════════════════════════════════
-       iOS Content Area
-       ═══════════════════════════════════════════════════════════════════ -->
-  <main class="ios-content" id="app-main">
+  <!-- ═══ CONTENT ═══ -->
+  <main class="app-content">
 
-    <!-- ─── View: Listing (Home / Search / Favorites / History) ─── -->
+    <!-- ── LISTING ── -->
     <section id="view-listing" class="view-section active">
 
-      <!-- Popular Banner (Home only) -->
-      <div id="popular-banner" class="ios-hidden">
-        <div class="ios-section-header" style="padding:0 16px;">
-          <h2 class="ios-section-title">🔥 Phổ Biến</h2>
-        </div>
-        <div id="popular-grid" class="ios-popular-scroll"></div>
+      <div id="popular-banner" class="hidden">
+        <div class="sec-hdr"><h2 class="sec-title">Phổ Biến</h2></div>
+        <div id="popular-grid" class="pop-scroll"></div>
       </div>
 
-      <!-- Listing Header -->
-      <div class="ios-section-header" style="padding:0 16px;">
-        <h2 id="listing-title" class="ios-section-title">📖 Mới Nhất</h2>
-        <div id="active-filter-badge" class="ios-filter-badge ios-hidden"></div>
+      <div class="sec-hdr">
+        <h2 id="listing-title" class="sec-title">Mới Nhất</h2>
       </div>
 
-      <!-- Gallery Grid -->
-      <div id="gallery-grid" class="ios-gallery-grid" style="padding:0 16px;"></div>
-
-      <!-- Loading State -->
-      <div id="listing-loader" class="ios-loader ios-hidden">
-        <div class="ios-spinner"></div>
+      <div id="gallery-grid" class="gallery-grid"></div>
+      <div id="listing-loader" class="loader hidden">
+        <div class="spinner"></div>
         <p>Đang tải...</p>
       </div>
 
-      <!-- Pagination -->
-      <div id="pagination" class="ios-pagination">
-        <button id="pg-first" class="ios-btn ios-btn-ghost" title="Trang đầu" style="font-size:13px;">««</button>
-        <button id="pg-prev" class="ios-btn ios-btn-secondary" style="font-size:13px;">« Trước</button>
-        <span class="ios-pagination-page">Trang <input type="number" id="pg-input" min="1" value="1"> / <span id="pg-max">1</span></span>
-        <button id="pg-next" class="ios-btn ios-btn-secondary" style="font-size:13px;">Sau »</button>
-        <button id="pg-last" class="ios-btn ios-btn-ghost" title="Trang cuối" style="font-size:13px;">»»</button>
-      </div>
-
-      <!-- Empty state for favorites/history -->
-      <div id="listing-empty" class="ios-empty-state ios-hidden">
-        <div class="ios-empty-icon">📭</div>
-        <div class="ios-empty-title">Trống</div>
-        <div class="ios-empty-desc" id="listing-empty-desc">Chưa có nội dung.</div>
+      <div id="pagination" class="pagination">
+        <button id="pg-prev" class="btn btn-sec" style="font-size:.8125rem;">Trước</button>
+        <span class="pg-info">Trang <input type="number" id="pg-input" min="1" value="1"> / <span id="pg-max">1</span></span>
+        <button id="pg-next" class="btn btn-sec" style="font-size:.8125rem;">Sau</button>
       </div>
     </section>
 
-    <!-- ─── View: Gallery Details ─── -->
-    <section id="view-details" class="view-section ios-hidden">
-      <button class="ios-btn-back" id="details-back-btn" style="margin:8px 16px;">
+    <!-- ── DETAILS ── -->
+    <section id="view-details" class="view-section">
+      <button class="btn-back" id="details-back-btn" style="margin:6px 12px;">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5">
           <polyline points="15 18 9 12 15 6"/>
         </svg>
         Quay lại
       </button>
 
-      <!-- Detail Card -->
-      <div class="ios-detail-header">
-        <div class="ios-detail-cover">
+      <div class="detail-card">
+        <div class="detail-cover">
           <img id="details-cover" src="" alt="Cover" referrerpolicy="no-referrer">
         </div>
-        <div class="ios-detail-info">
-          <h1 id="details-title-pretty" class="ios-detail-title">Title</h1>
-          <h3 id="details-title-english" class="ios-detail-subtitle">English Title</h3>
-          <h4 id="details-title-japanese" class="ios-detail-jp">Japanese Title</h4>
-          <div class="ios-detail-stats">
-            <span class="ios-stat">📄 <strong id="details-pages-count">0</strong> trang</span>
-            <span class="ios-stat">💖 <strong id="details-favs-count">0</strong></span>
-            <span class="ios-stat">📅 <span id="details-upload-date">N/A</span></span>
-            <span class="ios-stat">#<strong id="details-id">0</strong></span>
+        <div class="detail-info">
+          <h1 id="details-title-pretty" class="detail-title">Title</h1>
+          <h3 id="details-title-english" class="detail-sub">English</h3>
+          <h4 id="details-title-japanese" class="detail-jp">Japanese</h4>
+          <div class="detail-stats">
+            <span class="stat">Trang <strong id="details-pages-count">0</strong></span>
+            <span class="stat">Thích <strong id="details-favs-count">0</strong></span>
+            <span class="stat" id="details-upload-date">N/A</span>
+            <span class="stat">#<strong id="details-id">0</strong></span>
           </div>
-          <div class="ios-action-group">
-            <button id="btn-start-reading" class="ios-btn ios-btn-primary ios-btn-lg">📖 Đọc Ngay</button>
-            <button id="btn-toggle-fav" class="ios-btn ios-btn-secondary">💖 Yêu Thích</button>
-            <button id="btn-random-detail" class="ios-btn ios-btn-tertiary">🎲 Ngẫu Nhiên</button>
+          <div class="detail-actions">
+            <button id="btn-start-reading" class="btn btn-pri btn-lg">Đọc Ngay</button>
+            <button id="btn-toggle-fav" class="btn btn-sec">Yêu Thích</button>
           </div>
         </div>
       </div>
 
-      <!-- Tags -->
-      <div class="ios-tags-list" id="details-tags-list"></div>
+      <div id="details-tags-list" style="display:flex;flex-direction:column;gap:6px;padding:4px 0;"></div>
 
-      <div class="ios-divider"></div>
+      <div class="divider"></div>
 
-      <!-- Page Thumbnails -->
-      <div class="ios-section-header" style="padding:0 16px;">
-        <h3 class="ios-section-title" style="font-size:var(--ios-font-title3);">🖼️ Trang (<span id="thumb-count">0</span>)</h3>
-      </div>
-      <div id="pages-thumb-grid" class="ios-thumb-grid"></div>
+      <div class="sec-hdr"><h3 class="sec-title" style="font-size:1.125rem;">Trang (<span id="thumb-count">0</span>)</h3></div>
+      <div id="pages-thumb-grid" class="thumb-grid"></div>
 
-      <div class="ios-divider"></div>
+      <div class="divider"></div>
 
-      <!-- Related -->
-      <div class="ios-section-header" style="padding:0 16px;">
-        <h3 class="ios-section-title" style="font-size:var(--ios-font-title3);">🔗 Liên Quan</h3>
-      </div>
-      <div id="related-grid" class="ios-gallery-grid" style="padding:0 16px 32px;"></div>
+      <div class="sec-hdr"><h3 class="sec-title" style="font-size:1.125rem;">Liên Quan</h3></div>
+      <div id="related-grid" class="related-grid"></div>
     </section>
 
-    <!-- ─── View: Manga Reader ─── -->
-    <section id="view-reader" class="view-section ios-reader-overlay ios-hidden">
-      <!-- Reader Toolbar -->
-      <header class="ios-reader-toolbar" id="reader-toolbar">
-        <button id="reader-close-btn" class="ios-btn ios-btn-ghost" style="color:var(--ios-text-primary);font-size:14px;" aria-label="Thoát">
+    <!-- ── READER ── -->
+    <section id="view-reader" class="view-section">
+      <header class="reader-top">
+        <button id="reader-close-btn" class="btn btn-ghost" style="color:var(--txt);" aria-label="Thoát">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5">
             <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
           </svg>
         </button>
-
-        <div class="ios-reader-toolbar-center">
-          <div class="ios-reader-title" id="reader-book-title">Title</div>
-          <div class="ios-reader-page-indicator">
-            <span id="reader-page-indicator-text">1 / 1</span>
-          </div>
+        <div class="reader-top-center">
+          <div class="reader-top-title" id="reader-book-title">Title</div>
         </div>
-
-        <button id="btn-fullscreen" class="ios-btn ios-btn-ghost" style="color:var(--ios-text-primary);" aria-label="Toàn màn hình">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+        <button class="btn btn-ghost" style="color:var(--txt);" aria-label="Toàn màn hình" onclick="document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen()">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/>
             <line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>
           </svg>
         </button>
       </header>
 
-      <!-- Single Page Mode -->
-      <div id="single-reader-container" class="ios-reader-stage">
-        <div class="ios-reader-image-wrap" id="image-wrapper">
-          <img id="reader-current-img" src="" alt="Trang truyện" class="ios-reader-image fit-height" referrerpolicy="no-referrer">
-          <div id="reader-img-loader" class="ios-loader ios-hidden" style="position:absolute;padding:0;">
-            <div class="ios-spinner"></div>
+      <!-- Single Page -->
+      <div id="single-reader-container" class="reader-stage">
+        <div class="reader-img-wrap">
+          <img id="reader-current-img" src="" alt="" class="reader-main-img fit-height" referrerpolicy="no-referrer">
+          <div id="reader-img-loader" class="loader hidden" style="position:absolute;padding:0;">
+            <div class="spinner"></div>
           </div>
         </div>
-        <div class="ios-reader-touch-prev" id="zone-prev" aria-label="Trang trước"></div>
-        <div class="ios-reader-touch-next" id="zone-next" aria-label="Trang sau"></div>
+        <div class="reader-touch-l" id="zone-prev"></div>
+        <div class="reader-touch-r" id="zone-next"></div>
       </div>
 
-      <!-- Continuous Scroll Mode -->
-      <div id="continuous-reader-container" class="ios-reader-scroll ios-hidden">
-        <div id="continuous-pages-list" class="ios-reader-scroll-inner"></div>
+      <!-- Continuous Scroll -->
+      <div id="continuous-reader-container" class="reader-scroll hidden">
+        <div id="continuous-pages-list" class="reader-scroll-inner"></div>
       </div>
 
-      <!-- Reader Bottom Controls -->
-      <div class="ios-reader-bottom-bar" id="reader-bottom-bar">
-        <button id="btn-prev-page" class="ios-btn ios-btn-secondary" style="font-size:13px;">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      <!-- Bottom Bar -->
+      <div class="reader-bot" id="reader-page-nav">
+        <button id="btn-prev-page" class="btn btn-sec" style="font-size:.8125rem;">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
           Trước
         </button>
 
-        <select id="reader-mode-select" class="ios-search-sort" style="font-size:13px;">
-          <option value="single">📖 Từng trang</option>
-          <option value="continuous">📜 Cuộn</option>
+        <select id="reader-mode-select" style="background:var(--fill2);color:var(--txt);border:none;padding:6px 10px;border-radius:8px;font-size:.8125rem;outline:none;">
+          <option value="single">Từng trang</option>
+          <option value="continuous">Cuộn</option>
         </select>
 
-        <span class="ios-pagination-page" style="font-size:13px;">
-          <input type="number" id="reader-page-input" min="1" value="1" style="width:44px;font-size:13px;"> / <span id="reader-total-pages">1</span>
+        <span style="display:flex;align-items:center;gap:4px;font-size:.8125rem;color:var(--txt2);">
+          <input type="number" id="reader-page-input" min="1" value="1" style="width:40px;background:var(--fill2);border:.5px solid var(--sep);color:var(--txt);text-align:center;padding:4px 2px;border-radius:7px;font-size:.8125rem;font-weight:500;"> / <span id="reader-total-pages">1</span>
         </span>
 
-        <button id="btn-toggle-fit" class="ios-btn ios-btn-ghost" style="color:var(--ios-text-primary);font-size:13px;" title="Đổi kích thước">🔍</button>
-
-        <button id="btn-next-page" class="ios-btn ios-btn-secondary" style="font-size:13px;">
+        <button id="btn-next-page" class="btn btn-sec" style="font-size:.8125rem;">
           Sau
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
         </button>
       </div>
     </section>
 
   </main>
 
-  <!-- ═══════════════════════════════════════════════════════════════════
-       iOS Bottom Tab Bar
-       ═══════════════════════════════════════════════════════════════════ -->
-  <nav class="ios-tab-bar" id="ios-tab-bar" role="tablist" aria-label="Điều hướng chính">
-    <button class="ios-tab-item active" id="tab-home" role="tab" aria-selected="true" data-view="home">
+  <!-- ═══ BOTTOM TAB BAR ═══ -->
+  <nav class="tab-bar" role="tablist">
+    <button class="tab-item active" data-nav="nav-home">
       <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-        <polyline points="9 22 9 12 15 12 15 22"/>
+        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
       </svg>
       <span>Trang Chủ</span>
     </button>
-
-    <button class="ios-tab-item" id="tab-search" role="tab" aria-selected="false" data-view="search">
-      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-      </svg>
-      <span>Tìm Kiếm</span>
-    </button>
-
-    <button class="ios-tab-item" id="tab-popular" role="tab" aria-selected="false" data-view="popular">
+    <button class="tab-item" data-nav="nav-popular">
       <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
         <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
       </svg>
       <span>Hot</span>
     </button>
-
-    <button class="ios-tab-item" id="tab-favs" role="tab" aria-selected="false" data-view="favs">
+    <button class="tab-item" data-nav="nav-favs">
       <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
       </svg>
       <span>Yêu Thích</span>
-      <span class="ios-tab-badge ios-hidden" id="fav-count-badge">0</span>
+      <span class="tab-badge hidden" id="fav-count-badge">0</span>
     </button>
-
-    <button class="ios-tab-item" id="tab-history" role="tab" aria-selected="false" data-view="history">
+    <button class="tab-item" data-nav="nav-history">
       <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
       </svg>
@@ -275,8 +217,34 @@
     </button>
   </nav>
 
-  <!-- Toast Container -->
-  <div id="toast-container" class="ios-toast-container"></div>
+  <!-- Toast -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Tab bar click handler -->
+  <script>
+    document.querySelectorAll('.tab-item').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        const navId = tab.dataset.nav;
+        if (navId) {
+          const navBtn = document.getElementById(navId);
+          if (navBtn) navBtn.click();
+        }
+      });
+    });
+    // Sync top nav active state
+    const observer = new MutationObserver(() => {
+      const activeTop = document.querySelector('.nav-btn.active');
+      document.querySelectorAll('.tab-item').forEach(t => {
+        const navId = t.dataset.nav;
+        t.classList.toggle('active', navId && activeTop && activeTop.id === navId);
+      });
+    });
+    document.querySelectorAll('.nav-btn').forEach(b => {
+      observer.observe(b, { attributes: true, attributeFilter: ['class'] });
+    });
+  </script>
 
   <script src="app.js"></script>
 </body>

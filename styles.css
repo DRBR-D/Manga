@@ -83,11 +83,91 @@ input,select{font-family:inherit;font-size:inherit;color:var(--txt)}
 
 /* ── Utilities ── */
 .hidden{display:none!important}
+.no-data{grid-column:1/-1;text-align:center;padding:40px 16px;color:var(--txt3);font-size:.9375rem}
 
 /* ── View Sections ── */
 .view-section{display:none}
 .view-section.active{display:block}
-#view-reader.view-section.active{display:flex}
+#view-reader.view-section.active{display:flex;flex-direction:column}
+
+/* ═══════════════════════════════════════════════════════
+   DYNAMIC JS CLASSES — Gallery Cards
+   ═══════════════════════════════════════════════════════ */
+.gallery-card{
+  background:var(--bg2);border-radius:var(--r-md);overflow:hidden;
+  cursor:pointer;position:relative;
+  transition:transform var(--fast) var(--spring);
+}
+.gallery-card:active{transform:scale(.97)}
+.card-thumb-container{position:relative;width:100%;padding-top:142%;background:var(--bg3);overflow:hidden}
+.card-thumb-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.card-pages-badge{
+  position:absolute;bottom:6px;right:6px;
+  background:rgba(0,0,0,.78);color:#fff;
+  font-size:.6875rem;font-weight:600;padding:2px 6px;border-radius:5px;
+}
+.card-fav-btn{
+  position:absolute;top:6px;right:6px;
+  width:30px;height:30px;border-radius:50%;
+  background:rgba(0,0,0,.5);backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);
+  border:none;color:#fff;font-size:.8125rem;
+  display:flex;align-items:center;justify-content:center;
+  transition:all var(--fast) var(--spring);
+}
+.card-fav-btn:active{transform:scale(1.15)}
+.card-fav-btn.active{color:var(--pink)}
+.card-info{padding:10px 10px 12px}
+.card-title{
+  font-size:.8125rem;font-weight:500;line-height:1.35;color:var(--txt);
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+  overflow:hidden;text-overflow:ellipsis;
+}
+.card-meta{
+  margin-top:4px;display:flex;align-items:center;justify-content:space-between;
+  font-size:.75rem;color:var(--txt3);
+}
+
+/* ═══════════════════════════════════════════════════════
+   DYNAMIC JS CLASSES — Detail Tags
+   ═══════════════════════════════════════════════════════ */
+.tag-group{display:flex;align-items:flex-start;gap:10px;padding:0 12px}
+.tag-group-label{
+  width:64px;flex-shrink:0;font-size:.75rem;font-weight:500;
+  color:var(--txt3);text-transform:uppercase;letter-spacing:.02em;padding-top:4px;
+}
+.tag-badges-list{display:flex;flex-wrap:wrap;gap:5px;flex:1;padding-bottom:8px}
+.tag-chip{
+  display:inline-flex;align-items:center;gap:3px;
+  background:var(--fill2);color:var(--txt2);
+  font-size:.8125rem;padding:4px 9px;border-radius:7px;
+  border:none;cursor:pointer;
+  transition:all var(--fast) var(--spring);
+}
+.tag-chip:active{background:var(--blue);color:#fff}
+.tag-chip .count{font-size:.6875rem;opacity:.55}
+
+/* ═══════════════════════════════════════════════════════
+   DYNAMIC JS CLASSES — Page Thumbnails
+   ═══════════════════════════════════════════════════════ */
+.page-thumb-card{
+  background:var(--bg3);border-radius:var(--r-sm);overflow:hidden;
+  cursor:pointer;transition:transform var(--fast) var(--spring);
+}
+.page-thumb-card:active{transform:scale(.94)}
+.page-thumb-img{width:100%;height:100px;object-fit:cover}
+.page-thumb-num{text-align:center;padding:2px;font-size:.6875rem;color:var(--txt3);background:var(--bg2)}
+
+/* ═══════════════════════════════════════════════════════
+   DYNAMIC JS CLASSES — Reader
+   ═══════════════════════════════════════════════════════ */
+.reader-main-img{display:block;transition:opacity var(--fast) var(--spring)}
+.reader-main-img.fit-height{max-height:calc(100vh - 100px);width:auto}
+.reader-main-img.fit-width{width:92vw;max-width:1200px;height:auto}
+.reader-main-img.fit-original{max-width:none;max-height:none}
+.continuous-page-item{width:100%;display:flex;flex-direction:column;align-items:center;position:relative}
+.continuous-page-img{max-width:100%;height:auto;border-radius:2px}
+.continuous-page-num{font-size:.6875rem;color:var(--txt3);margin-top:3px;text-align:center}
 
 /* ═══════════════════════════════════════════════════════
    TOP NAV BAR — iOS blur
