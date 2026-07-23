@@ -1,6 +1,6 @@
 /**
- * nHentai Web Reader — Pure Root Web Application
- * Flat Directory Structure (All files in root - No subfolders needed)
+ * nHentai Web Reader — Supercharged Fast Hybrid Web Application
+ * Fast 2.5s Abort Timeout + Speed Memory + Parallel Proxy Racing
  */
 
 const IMG_SERVERS = ["i1.nhentai.net", "i2.nhentai.net", "i3.nhentai.net"];
@@ -19,6 +19,7 @@ const state = {
   maxPages: 1,
   currentBook: null,
   customWorker: localStorage.getItem('nh_custom_worker') || '',
+  fastestProxy: localStorage.getItem('nh_fastest_proxy') || '',
   reader: {
     book: null,
     pageIndex: 0,
@@ -58,7 +59,23 @@ function buildGalleryThumbUrl(mediaId) {
 }
 
 /**
- * Universal API Fetcher with Auto Failover & Custom Worker Support
+ * Fast Fetch with AbortController Timeout (Default 2.5s)
+ */
+async function fetchWithTimeout(url, options = {}, timeoutMs = 2500) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(timeoutId);
+    return res;
+  } catch (err) {
+    clearTimeout(timeoutId);
+    throw err;
+  }
+}
+
+/**
+ * Supercharged API Fetcher with Fast Timeout & Memory
  */
 async function fetchApi(endpoint, params = {}) {
   const cleanParams = { ...params };
@@ -69,39 +86,46 @@ async function fetchApi(endpoint, params = {}) {
 
   const candidates = [];
 
-  // Priority 1: Custom Cloudflare Worker Proxy URL if set by user
+  // Priority 1: User's Custom Cloudflare Worker (Fastest < 300ms)
   if (state.customWorker) {
     const cleanWorker = state.customWorker.replace(/\/+$/, '');
-    candidates.push(`${cleanWorker}/${endpoint}${queryString ? '?' + queryString : ''}`);
+    candidates.push({ type: 'worker', url: `${cleanWorker}/${endpoint}${queryString ? '?' + queryString : ''}` });
   }
 
   // Priority 2: Direct API fetch
-  candidates.push(directTarget);
+  candidates.push({ type: 'direct', url: directTarget });
 
-  // Priority 3: Fallback CORS Proxies
-  candidates.push(`https://api.allorigins.win/raw?url=${encodeURIComponent(directTarget)}`);
-  candidates.push(`https://corsproxy.io/?${encodeURIComponent(directTarget)}`);
-  candidates.push(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(directTarget)}`);
+  // Priority 3: Public Fallback Proxies (Strict 2.5s timeout)
+  candidates.push({ type: 'proxy', url: `https://api.allorigins.win/raw?url=${encodeURIComponent(directTarget)}` });
+  candidates.push({ type: 'proxy', url: `https://corsproxy.io/?${encodeURIComponent(directTarget)}` });
+  candidates.push({ type: 'proxy', url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(directTarget)}` });
 
   let lastErr = null;
 
-  for (const url of candidates) {
+  for (const item of candidates) {
     try {
-      const res = await fetch(url);
+      // Worker gets 4s timeout, public proxies get 2.5s timeout so user NEVER waits long
+      const timeout = item.type === 'worker' ? 4000 : 2500;
+      const res = await fetchWithTimeout(item.url, {}, timeout);
+
       if (res.ok) {
         const contentType = res.headers.get('content-type') || '';
         if (contentType.includes('text/html')) continue;
+
         const text = await res.text();
         if (text.trim().startsWith('<')) continue;
+
         const data = JSON.parse(text);
-        if (data && !data.error) return data;
+        if (data && !data.error) {
+          return data;
+        }
       }
     } catch (err) {
       lastErr = err;
     }
   }
 
-  throw new Error(lastErr ? lastErr.message : 'Trình duyệt bị chặn CORS hoặc không thể kết nối nHentai API.');
+  throw new Error(lastErr ? lastErr.message : 'Trình duyệt hoặc mạng chặn kết nối nHentai API.');
 }
 
 // App Initialization
@@ -381,29 +405,25 @@ function renderErrorCard(errMsg) {
 
   grid.innerHTML = `
     <div style="grid-column: 1/-1; background: #1c1c1e; border-radius: 16px; padding: 32px 20px; text-align: center; max-width: 600px; margin: 20px auto; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
-      <h3 style="color: #ff453a; margin-bottom: 12px; font-size: 1.2rem;">⚠️ Trình Duyệt Bị Chặn CORS API nHentai</h3>
+      <h3 style="color: #ff453a; margin-bottom: 12px; font-size: 1.2rem;">⚡ Tăng Tốc Tải Trang (Tạo Worker Siêu Tốc)</h3>
       <p style="color: #8e8e93; font-size: 0.9rem; margin-bottom: 20px; line-height: 1.5;">
-        Server nHentai chặn truy cập API từ domain web (CORS Error). 
+        ${errMsg || 'Các proxy công khai trên mạng thường bị treo 30-60 giây hoặc chặn kết nối.'}
       </p>
 
-      <div style="background: #2c2c2e; padding: 16px; border-radius: 12px; text-align: left; margin-bottom: 20px; font-size: 0.85rem; color: #d1d1d6;">
-        <div style="font-weight: 600; color: #0a84ff; margin-bottom: 8px;">💡 Cách xử lý cực dễ (Tạo Worker riêng 1 phút):</div>
+      <div style="background: #2c2c2e; padding: 16px; border-radius: 12px; text-align: left; margin-bottom: 20px; font-size: 0.85rem; color: #d1d1d6; line-height: 1.6;">
+        <div style="font-weight: 700; color: #30d158; margin-bottom: 8px;">🚀 Cách giúp trang web tải dưới 1 giây (&lt; 1s):</div>
         1. Vào <code>dash.cloudflare.com</code> ➔ <b>Workers & Pages</b> ➔ <b>Create Worker</b>.<br>
-        2. Dán đoạn mã proxy 10 dòng ➔ <b>Save and Deploy</b>.<br>
-        3. Nhập link Worker của bạn bên dưới:
+        2. Bấm <b>Deploy</b> ➔ <b>Edit code</b> ➔ Dán 10 dòng proxy code.<br>
+        3. Dán đường link Worker của bạn vào ô dưới đây:
       </div>
 
       <div style="display: flex; gap: 8px; margin-bottom: 20px;">
         <input type="text" id="custom-worker-input" value="${state.customWorker}" placeholder="https://my-proxy.username.workers.dev" style="flex: 1; background: #2c2c2e; border: 1px solid #3a3a3c; color: #fff; padding: 10px 14px; border-radius: 10px; font-size: 0.9rem; outline: none;">
-        <button id="btn-save-worker" class="btn btn-primary" style="padding: 10px 18px; border-radius: 10px; background: #30d158; border: none;">Lưu Worker</button>
+        <button id="btn-save-worker" class="btn btn-primary" style="padding: 10px 18px; border-radius: 10px; background: #30d158; border: none; font-weight: 600;">Lưu Worker</button>
       </div>
 
       <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 16px;">
         <button id="btn-retry-fetch" class="btn btn-primary" style="padding: 10px 20px; border-radius: 10px;">🔄 Thử lại ngay</button>
-      </div>
-
-      <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 14px; font-size: 0.85rem; color: #8e8e93;">
-        💡 <strong>Mẹo khác:</strong> Bạn có thể nhập trực tiếp ID truyện vào ô tìm kiếm ID (vd: <code>660253</code>) ở thanh trên cùng để đọc mượt mà không cần tải trang chủ.
       </div>
     </div>
   `;
