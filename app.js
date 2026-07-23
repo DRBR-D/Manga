@@ -1,10 +1,10 @@
 /**
- * nHentai iOS Web Reader — Static Web App
- * iOS Human Interface Guidelines compliant
- * Optimized for iPhone SE (4.7" / 375x667)
+ * nHentai Web Reader — Hybrid Web Application
+ * Compatible with Cloudflare Pages (dash.cloudflare.com), GitHub Pages, and Local Hosting
+ * Based on nhentai-api-docs.md specification
  */
 
-// CDN Domain Configs (Deterministic hash algorithm)
+// CDN Domain Configs (Deterministic hash algorithm as in md)
 const IMG_SERVERS = ["i1.nhentai.net", "i2.nhentai.net", "i3.nhentai.net"];
 const THUMB_SERVERS = ["t1.nhentai.net", "t2.nhentai.net", "t3.nhentai.net", "t4.nhentai.net"];
 const IMG_EXT_MAP = { j: "jpg", p: "png", g: "gif", w: "webp" };
@@ -12,7 +12,6 @@ const IMG_EXT_MAP = { j: "jpg", p: "png", g: "gif", w: "webp" };
 // Global State
 const state = {
   activeView: 'listing',
-  activeTab: 'home',
   listingType: 'home', // 'home', 'search', 'tag', 'popular', 'favs', 'history'
   query: '',
   tagId: null,
@@ -31,9 +30,7 @@ const state = {
   history: JSON.parse(localStorage.getItem('nh_history') || '{}')
 };
 
-// ═══════════════════════════════════════════════════════════════════════
-// CDN Helpers
-// ═══════════════════════════════════════════════════════════════════════
+// CDN Helper Functions
 function pickServer(servers, mediaId) {
   if (!mediaId) return servers[0];
   const hash = String(mediaId).split("").reduce((a, c) => a + c.charCodeAt(0), 0);
@@ -41,74 +38,86 @@ function pickServer(servers, mediaId) {
 }
 
 function buildPageImageUrl(mediaId, path) {
-  return `https://${pickServer(IMG_SERVERS, mediaId)}/${path}`;
+  const srv = pickServer(IMG_SERVERS, mediaId);
+  return `https://${srv}/${path}`;
 }
 
 function buildPageThumbUrl(mediaId, thumbnailOrPath) {
-  return `https://${pickServer(THUMB_SERVERS, mediaId)}/${thumbnailOrPath}`;
+  const srv = pickServer(THUMB_SERVERS, mediaId);
+  return `https://${srv}/${thumbnailOrPath}`;
 }
 
 function buildCoverUrl(mediaId, imgType = "j") {
   const ext = IMG_EXT_MAP[imgType] || "jpg";
-  return `https://${pickServer(THUMB_SERVERS, mediaId)}/galleries/${mediaId}/cover.${ext}`;
+  const srv = pickServer(THUMB_SERVERS, mediaId);
+  return `https://${srv}/galleries/${mediaId}/cover.${ext}`;
 }
 
 function buildGalleryThumbUrl(mediaId) {
-  return `https://${pickServer(THUMB_SERVERS, mediaId)}/galleries/${mediaId}/thumb.webp`;
+  const srv = pickServer(THUMB_SERVERS, mediaId);
+  return `https://${srv}/galleries/${mediaId}/thumb.webp`;
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// API Fetcher with CORS Proxy Fallbacks
-// ═══════════════════════════════════════════════════════════════════════
+/**
+ * Universal Smart API Fetcher
+ * Strategy:
+ * 1. Relative `/api/` (Works automatically on Cloudflare Pages via Functions & Local Server)
+ * 2. Direct `https://nhentai.net/api/v2/`
+ * 3. Public CORS Proxies (allorigins, corsproxy, etc. for GitHub Pages)
+ */
 async function fetchApi(endpoint, params = {}) {
   const cleanParams = { ...params };
-  if (cleanParams.sort === 'recent') delete cleanParams.sort;
+  if (cleanParams.sort === 'recent') delete cleanParams.sort; // Prevent 400 Bad Request on v2 search
 
   const queryString = new URLSearchParams(cleanParams).toString();
-  const rawTargetUrl = `https://nhentai.net/api/v2/${endpoint}${queryString ? '?' + queryString : ''}`;
+  const relUrl = `/api/${endpoint}${queryString ? '?' + queryString : ''}`;
+  const directUrl = `https://nhentai.net/api/v2/${endpoint}${queryString ? '?' + queryString : ''}`;
 
-  const fetchTargets = [
-    rawTargetUrl,
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(rawTargetUrl)}`,
-    `https://corsproxy.io/?${encodeURIComponent(rawTargetUrl)}`
+  // Candidates array in order of preference
+  const candidates = [
+    relUrl, // Cloudflare Pages Function or Local Express Proxy
+    directUrl, // Direct API fetch
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(directUrl)}`,
+    `https://corsproxy.io/?${encodeURIComponent(directUrl)}`,
+    `https://cors.eu.org/${directUrl}`
   ];
 
   let lastError = null;
-  for (const url of fetchTargets) {
+
+  for (const url of candidates) {
     try {
       const res = await fetch(url);
-      if (res.ok) return await res.json();
+      if (res.ok) {
+        const data = await res.json();
+        if (data && !data.error) {
+          return data;
+        }
+      }
     } catch (err) {
       lastError = err;
     }
   }
-  throw new Error(lastError ? lastError.message : 'Không thể lấy dữ liệu từ nHentai API');
+
+  throw new Error(lastError ? lastError.message : 'Không thể kết nối nHentai API. Hãy kiểm tra lại mạng hoặc thử chọn server khác.');
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// Initialize
-// ═══════════════════════════════════════════════════════════════════════
+// Application Initialization
 document.addEventListener('DOMContentLoaded', () => {
   setupEventListeners();
   updateFavBadge();
   loadHomepage();
 });
 
-// ═══════════════════════════════════════════════════════════════════════
 // Event Listeners
-// ═══════════════════════════════════════════════════════════════════════
 function setupEventListeners() {
-  // ── Brand / Logo ──
   document.getElementById('brand-logo').addEventListener('click', () => {
     state.listingType = 'home';
     state.query = '';
     state.tagId = null;
     state.page = 1;
-    setActiveTab('tab-home');
     loadHomepage();
   });
 
-  // ── Search Form ──
   document.getElementById('search-form').addEventListener('submit', (e) => {
     e.preventDefault();
     const query = document.getElementById('search-input').value.trim();
@@ -121,20 +130,6 @@ function setupEventListeners() {
     loadListing();
   });
 
-  // Search clear button
-  document.getElementById('search-clear-btn').addEventListener('click', () => {
-    const input = document.getElementById('search-input');
-    input.value = '';
-    input.focus();
-    state.listingType = 'home';
-    state.query = '';
-    state.tagId = null;
-    state.page = 1;
-    setActiveTab('tab-home');
-    loadHomepage();
-  });
-
-  // Sort change
   document.getElementById('sort-select').addEventListener('change', () => {
     if (state.listingType === 'search' || state.listingType === 'tag') {
       state.sort = document.getElementById('sort-select').value;
@@ -143,50 +138,38 @@ function setupEventListeners() {
     }
   });
 
-  // ── ID Jumper ──
   document.getElementById('jump-id-btn').addEventListener('click', jumpToId);
   document.getElementById('jump-id-input').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') jumpToId();
   });
 
-  // ── Random (top nav) ──
-  document.getElementById('btn-random-top').addEventListener('click', fetchRandomBook);
-
-  // ── Bottom Tab Bar ──
-  document.querySelectorAll('.ios-tab-item').forEach(tab => {
-    tab.addEventListener('click', () => {
-      const view = tab.dataset.view;
-      switch (view) {
-        case 'home':
-          setActiveTab('tab-home');
-          state.listingType = 'home';
-          state.page = 1;
-          loadHomepage();
-          break;
-        case 'search':
-          setActiveTab('tab-search');
-          document.getElementById('search-input').focus();
-          break;
-        case 'popular':
-          setActiveTab('tab-popular');
-          state.listingType = 'popular';
-          loadPopularSectionOnly();
-          break;
-        case 'favs':
-          setActiveTab('tab-favs');
-          state.listingType = 'favs';
-          renderFavsView();
-          break;
-        case 'history':
-          setActiveTab('tab-history');
-          state.listingType = 'history';
-          renderHistoryView();
-          break;
-      }
-    });
+  document.getElementById('nav-home').addEventListener('click', () => {
+    setActiveNav('nav-home');
+    state.listingType = 'home';
+    state.page = 1;
+    loadHomepage();
   });
 
-  // ── Pagination ──
+  document.getElementById('nav-popular').addEventListener('click', () => {
+    setActiveNav('nav-popular');
+    state.listingType = 'popular';
+    loadPopularSectionOnly();
+  });
+
+  document.getElementById('nav-random').addEventListener('click', fetchRandomBook);
+
+  document.getElementById('nav-favs').addEventListener('click', () => {
+    setActiveNav('nav-favs');
+    state.listingType = 'favs';
+    renderFavsView();
+  });
+
+  document.getElementById('nav-history').addEventListener('click', () => {
+    setActiveNav('nav-history');
+    state.listingType = 'history';
+    renderHistoryView();
+  });
+
   document.getElementById('pg-first').addEventListener('click', () => changePage(1));
   document.getElementById('pg-prev').addEventListener('click', () => changePage(state.page - 1));
   document.getElementById('pg-next').addEventListener('click', () => changePage(state.page + 1));
@@ -198,7 +181,6 @@ function setupEventListeners() {
     changePage(p);
   });
 
-  // ── Detail View ──
   document.getElementById('details-back-btn').addEventListener('click', () => {
     switchView('listing');
   });
@@ -213,7 +195,6 @@ function setupEventListeners() {
 
   document.getElementById('btn-random-detail').addEventListener('click', fetchRandomBook);
 
-  // ── Reader Controls ──
   document.getElementById('reader-close-btn').addEventListener('click', closeReader);
 
   document.getElementById('reader-mode-select').addEventListener('change', (e) => {
@@ -241,78 +222,32 @@ function setupEventListeners() {
 
   document.getElementById('btn-fullscreen').addEventListener('click', toggleFullscreen);
 
-  // Reader touch zones
   document.getElementById('zone-prev').addEventListener('click', () => stepReaderPage(-1));
   document.getElementById('zone-next').addEventListener('click', () => stepReaderPage(1));
 
-  // Keyboard shortcuts
   document.addEventListener('keydown', handleGlobalKeyDown);
-
-  // Reader toolbar auto-hide on tap (toggle)
-  document.getElementById('single-reader-container').addEventListener('click', (e) => {
-    if (e.target === e.currentTarget) {
-      toggleReaderToolbar();
-    }
-  });
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// Tab Bar
-// ═══════════════════════════════════════════════════════════════════════
-function setActiveTab(tabId) {
-  state.activeTab = tabId;
-  document.querySelectorAll('.ios-tab-item').forEach(t => {
-    t.classList.remove('active');
-    t.setAttribute('aria-selected', 'false');
-  });
-  const target = document.getElementById(tabId);
-  if (target) {
-    target.classList.add('active');
-    target.setAttribute('aria-selected', 'true');
-  }
+function setActiveNav(navId) {
+  document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+  const target = document.getElementById(navId);
+  if (target) target.classList.add('active');
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// View Switching
-// ═══════════════════════════════════════════════════════════════════════
 function switchView(viewName) {
   state.activeView = viewName;
-  document.querySelectorAll('.view-section').forEach(sec => sec.classList.add('ios-hidden'));
-
-  if (viewName === 'listing') {
-    const listingSec = document.getElementById('view-listing');
-    if (listingSec) listingSec.classList.remove('ios-hidden');
-  } else if (viewName === 'details') {
-    const detailsSec = document.getElementById('view-details');
-    if (detailsSec) detailsSec.classList.remove('ios-hidden');
-  } else if (viewName === 'reader') {
-    const readerSec = document.getElementById('view-reader');
-    if (readerSec) readerSec.classList.remove('ios-hidden');
-  }
-
-  // Toggle bottom tab bar visibility (hide in reader)
-  const tabBar = document.getElementById('ios-tab-bar');
-  if (viewName === 'reader') {
-    tabBar.classList.add('ios-hidden');
-  } else {
-    tabBar.classList.remove('ios-hidden');
-  }
+  document.querySelectorAll('.view-section').forEach(sec => sec.classList.remove('active'));
+  const activeSec = document.getElementById(`view-${viewName}`);
+  if (activeSec) activeSec.classList.add('active');
 }
 
-// ═══════════════════════════════════════════════════════════════════════
 // Data Fetching: Homepage
-// ═══════════════════════════════════════════════════════════════════════
 async function loadHomepage() {
   switchView('listing');
-  const popularBanner = document.getElementById('popular-banner');
-  const paginationBar = document.getElementById('pagination');
-  const filterBadge = document.getElementById('active-filter-badge');
-  const listingTitle = document.getElementById('listing-title');
-
-  popularBanner.classList.remove('ios-hidden');
-  paginationBar.classList.remove('ios-hidden');
-  filterBadge.classList.add('ios-hidden');
-  listingTitle.textContent = '📖 Mới Nhất';
+  setActiveNav('nav-home');
+  document.getElementById('popular-banner').classList.remove('hidden');
+  document.getElementById('active-filter-badge').classList.add('hidden');
+  document.getElementById('listing-title').textContent = '📖 Galleries Mới Nhất';
 
   showLoader(true);
   try {
@@ -326,62 +261,55 @@ async function loadHomepage() {
     state.maxPages = homeData.num_pages || 1;
     updatePaginationUI();
   } catch (err) {
-    showToast(`Lỗi: ${err.message}`);
+    showToast(`Lỗi tải trang chủ: ${err.message}`);
   } finally {
     showLoader(false);
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// Data Fetching: Popular Only
-// ═══════════════════════════════════════════════════════════════════════
+// Data Fetching: Popular Section Only
 async function loadPopularSectionOnly() {
   switchView('listing');
-  document.getElementById('popular-banner').classList.add('ios-hidden');
-  document.getElementById('pagination').classList.add('ios-hidden');
-
-  const filterBadge = document.getElementById('active-filter-badge');
-  filterBadge.classList.remove('ios-hidden');
-  filterBadge.textContent = '🔥 Hot';
-
-  document.getElementById('listing-title').textContent = '🔥 Phổ Biến';
+  document.getElementById('popular-banner').classList.add('hidden');
+  document.getElementById('active-filter-badge').classList.remove('hidden');
+  document.getElementById('active-filter-badge').textContent = '🔥 Hot Popular';
+  document.getElementById('listing-title').textContent = '🔥 Galleries Phổ Biến';
 
   showLoader(true);
   try {
     const popularData = await fetchApi('galleries/popular');
     renderGalleryGrid(popularData || []);
+    document.getElementById('pagination').style.display = 'none';
   } catch (err) {
-    showToast(`Lỗi: ${err.message}`);
+    showToast(`Lỗi tải phổ biến: ${err.message}`);
   } finally {
     showLoader(false);
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════
 // Data Fetching: Search & Tag Filter
-// ═══════════════════════════════════════════════════════════════════════
 async function loadListing() {
   switchView('listing');
-  document.getElementById('popular-banner').classList.add('ios-hidden');
-  document.getElementById('pagination').classList.remove('ios-hidden');
+  document.getElementById('popular-banner').classList.add('hidden');
+  document.getElementById('pagination').style.display = 'flex';
 
   const filterBadge = document.getElementById('active-filter-badge');
-  filterBadge.classList.remove('ios-hidden');
+  filterBadge.classList.remove('hidden');
 
   showLoader(true);
   try {
     let data;
     if (state.listingType === 'search') {
-      filterBadge.textContent = `"${state.query}"`;
-      document.getElementById('listing-title').textContent = '🔍 Kết Quả';
+      filterBadge.textContent = `Từ khóa: "${state.query}"`;
+      document.getElementById('listing-title').textContent = '🔍 Kết Quả Tìm Kiếm';
       data = await fetchApi('search', {
         query: state.query,
         page: state.page,
         sort: state.sort
       });
     } else if (state.listingType === 'tag') {
-      filterBadge.textContent = `${state.tagName || ('Tag: ' + state.tagId)}`;
-      document.getElementById('listing-title').textContent = '🏷️ Theo Tag';
+      filterBadge.textContent = `Tag: ${state.tagName || ('ID ' + state.tagId)}`;
+      document.getElementById('listing-title').textContent = '🏷️ Danh Sách Theo Tag';
       data = await fetchApi('galleries/tagged', {
         tag_id: state.tagId,
         page: state.page,
@@ -393,15 +321,12 @@ async function loadListing() {
     state.maxPages = data.num_pages || 1;
     updatePaginationUI();
   } catch (err) {
-    showToast(`Lỗi: ${err.message}`);
+    showToast(`Lỗi tìm kiếm: ${err.message}`);
   } finally {
     showLoader(false);
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// Jump to ID
-// ═══════════════════════════════════════════════════════════════════════
 async function jumpToId() {
   const input = document.getElementById('jump-id-input');
   const bookId = parseInt(input.value.trim(), 10);
@@ -412,9 +337,6 @@ async function jumpToId() {
   loadBookDetails(bookId);
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// Random Book
-// ═══════════════════════════════════════════════════════════════════════
 async function fetchRandomBook() {
   showToast('Đang chọn truyện ngẫu nhiên...');
   try {
@@ -423,28 +345,18 @@ async function fetchRandomBook() {
       loadBookDetails(book.id);
     }
   } catch (err) {
-    showToast(`Lỗi: ${err.message}`);
+    showToast(`Lỗi lấy random: ${err.message}`);
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// Render Gallery Grid
-// ═══════════════════════════════════════════════════════════════════════
 function renderGalleryGrid(galleries) {
   const grid = document.getElementById('gallery-grid');
   grid.innerHTML = '';
 
   if (!galleries || galleries.length === 0) {
-    const empty = document.getElementById('listing-empty');
-    if (empty) {
-      empty.classList.remove('ios-hidden');
-      document.getElementById('listing-empty-desc').textContent = 'Không tìm thấy gallery nào.';
-    }
+    grid.innerHTML = '<p class="no-data">Không tìm thấy gallery nào.</p>';
     return;
   }
-
-  const empty = document.getElementById('listing-empty');
-  if (empty) empty.classList.add('ios-hidden');
 
   galleries.forEach(item => {
     const card = createGalleryCard(item);
@@ -458,8 +370,8 @@ function renderPopularBanner(popularGalleries) {
 
   if (!popularGalleries || popularGalleries.length === 0) return;
 
-  popularGalleries.slice(0, 8).forEach(item => {
-    const card = createPopularCard(item);
+  popularGalleries.slice(0, 5).forEach(item => {
+    const card = createGalleryCard(item);
     bannerGrid.appendChild(card);
   });
 }
@@ -474,16 +386,16 @@ function createGalleryCard(item) {
     : buildGalleryThumbUrl(mediaId);
 
   const card = document.createElement('div');
-  card.className = 'ios-card';
+  card.className = 'gallery-card';
   card.innerHTML = `
-    <div class="ios-card-thumb">
-      <img src="${thumbUrl}" alt="${titleText}" loading="lazy" referrerpolicy="no-referrer" onerror="this.src='https://via.placeholder.com/250x350/2C2C2E/ffffff?text=No+Cover'">
-      <span class="ios-card-badge">${item.num_pages}P</span>
-      <button class="ios-card-fav-btn ${isFav ? 'active' : ''}" title="${isFav ? 'Bỏ yêu thích' : 'Thêm yêu thích'}">♥</button>
+    <div class="card-thumb-container">
+      <img src="${thumbUrl}" alt="${titleText}" class="card-thumb-img" loading="lazy" referrerpolicy="no-referrer" onerror="this.src='https://via.placeholder.com/250x350/1e212d/ffffff?text=No+Cover'">
+      <span class="card-pages-badge">${item.num_pages}P</span>
+      <button class="card-fav-btn ${isFav ? 'active' : ''}" title="Thêm vào yêu thích">♥</button>
     </div>
-    <div class="ios-card-info">
-      <div class="ios-card-title" title="${titleText}">${titleText}</div>
-      <div class="ios-card-meta">
+    <div class="card-info">
+      <div class="card-title" title="${titleText}">${titleText}</div>
+      <div class="card-meta">
         <span>#${item.id}</span>
         <span>💖 ${item.num_favorites || 0}</span>
       </div>
@@ -491,11 +403,11 @@ function createGalleryCard(item) {
   `;
 
   card.addEventListener('click', (e) => {
-    if (e.target.classList.contains('ios-card-fav-btn')) return;
+    if (e.target.classList.contains('card-fav-btn')) return;
     loadBookDetails(item.id);
   });
 
-  const favBtn = card.querySelector('.ios-card-fav-btn');
+  const favBtn = card.querySelector('.card-fav-btn');
   favBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     toggleFavorite(item, favBtn);
@@ -504,33 +416,6 @@ function createGalleryCard(item) {
   return card;
 }
 
-function createPopularCard(item) {
-  const mediaId = item.media_id;
-  const titleText = item.title ? (item.title.pretty || item.title.english) : `Gallery #${item.id}`;
-
-  const thumbUrl = item.thumbnail && item.thumbnail.includes('/')
-    ? `https://${pickServer(THUMB_SERVERS, mediaId)}/${item.thumbnail}`
-    : buildGalleryThumbUrl(mediaId);
-
-  const card = document.createElement('div');
-  card.className = 'ios-popular-card';
-  card.innerHTML = `
-    <div class="ios-popular-thumb">
-      <img src="${thumbUrl}" alt="${titleText}" loading="lazy" referrerpolicy="no-referrer" onerror="this.src='https://via.placeholder.com/250x350/2C2C2E/ffffff?text=No+Cover'">
-    </div>
-    <div class="ios-popular-info">
-      <div class="ios-popular-title">${titleText}</div>
-      <div class="ios-popular-meta">#${item.id} · ${item.num_pages}P</div>
-    </div>
-  `;
-
-  card.addEventListener('click', () => loadBookDetails(item.id));
-  return card;
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-// Book Details
-// ═══════════════════════════════════════════════════════════════════════
 async function loadBookDetails(bookId) {
   showLoader(true);
   try {
@@ -546,7 +431,7 @@ async function loadBookDetails(bookId) {
     switchView('details');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   } catch (err) {
-    showToast(`Không thể tải #${bookId}: ${err.message}`);
+    showToast(`Không thể tải thông tin truyện #${bookId}: ${err.message}`);
   } finally {
     showLoader(false);
   }
@@ -571,8 +456,8 @@ function renderDetailsView(book) {
 
   const isFav = !!state.favorites[book.id];
   const favBtn = document.getElementById('btn-toggle-fav');
-  favBtn.textContent = isFav ? '💔 Bỏ Yêu Thích' : '💖 Yêu Thích';
-  favBtn.className = isFav ? 'ios-btn ios-btn-danger' : 'ios-btn ios-btn-secondary';
+  favBtn.textContent = isFav ? '💔 Bỏ Yêu Thích' : '💖 Thêm Vào Yêu Thích';
+  favBtn.className = isFav ? 'btn btn-outline btn-lg active' : 'btn btn-outline btn-lg';
 
   renderDetailsTags(book.tags || []);
   renderDetailsThumbnails(book);
@@ -594,18 +479,18 @@ function renderDetailsTags(tags) {
   categoryOrder.forEach(cat => {
     if (!groups[cat]) return;
     const groupEl = document.createElement('div');
-    groupEl.className = 'ios-tag-group';
+    groupEl.className = 'tag-group';
 
     const labelEl = document.createElement('div');
-    labelEl.className = 'ios-tag-label';
+    labelEl.className = 'tag-group-label';
     labelEl.textContent = cat;
 
     const listEl = document.createElement('div');
-    listEl.className = 'ios-tag-chips';
+    listEl.className = 'tag-badges-list';
 
     groups[cat].forEach(t => {
-      const chip = document.createElement('button');
-      chip.className = 'ios-tag-chip';
+      const chip = document.createElement('span');
+      chip.className = 'tag-chip';
       chip.innerHTML = `${t.name} <span class="count">${t.count ? '(' + formatCount(t.count) + ')' : ''}</span>`;
       chip.addEventListener('click', () => {
         state.listingType = 'tag';
@@ -636,12 +521,16 @@ function renderDetailsThumbnails(book) {
     const thumbUrl = buildPageThumbUrl(mediaId, p.thumbnail || p.path);
 
     const card = document.createElement('div');
-    card.className = 'ios-thumb-card';
+    card.className = 'page-thumb-card';
     card.innerHTML = `
-      <img src="${thumbUrl}" alt="Trang ${pageNum}" loading="lazy" referrerpolicy="no-referrer">
-      <div class="page-num">${pageNum}</div>
+      <img src="${thumbUrl}" alt="Page ${pageNum}" class="page-thumb-img" loading="lazy" referrerpolicy="no-referrer">
+      <div class="page-thumb-num">${pageNum}</div>
     `;
-    card.addEventListener('click', () => openReader(book, idx));
+
+    card.addEventListener('click', () => {
+      openReader(book, idx);
+    });
+
     grid.appendChild(card);
   });
 }
@@ -650,7 +539,7 @@ function renderRelatedSection(relatedList) {
   const grid = document.getElementById('related-grid');
   grid.innerHTML = '';
   if (!relatedList || relatedList.length === 0) {
-    grid.innerHTML = '<p style="color:var(--ios-text-tertiary);text-align:center;padding:24px;font-size:14px;">Không có đề xuất.</p>';
+    grid.innerHTML = '<p class="no-data">Không có đề xuất.</p>';
     return;
   }
 
@@ -660,23 +549,20 @@ function renderRelatedSection(relatedList) {
   });
 }
 
-// ═══════════════════════════════════════════════════════════════════════
 // Reader Engine
-// ═══════════════════════════════════════════════════════════════════════
 function openReader(book, startIndex = 0) {
   state.reader.book = book;
   state.reader.pageIndex = Math.max(0, Math.min(startIndex, book.pages.length - 1));
 
   document.getElementById('reader-book-title').textContent = book.title?.pretty || book.title?.english || `Gallery #${book.id}`;
   document.getElementById('reader-total-pages').textContent = book.pages.length;
-  document.getElementById('reader-page-indicator-text').textContent = `${startIndex + 1} / ${book.pages.length}`;
 
   switchView('reader');
   renderReaderStage();
 }
 
 function closeReader() {
-  switchView(state.currentBook ? 'details' : 'listing');
+  switchView('details');
   if (document.fullscreenElement) {
     document.exitFullscreen().catch(() => {});
   }
@@ -688,12 +574,14 @@ function renderReaderStage() {
   const continuousContainer = document.getElementById('continuous-reader-container');
 
   if (mode === 'single') {
-    singleContainer.classList.remove('ios-hidden');
-    continuousContainer.classList.add('ios-hidden');
+    singleContainer.classList.remove('hidden');
+    continuousContainer.classList.add('hidden');
+    document.getElementById('reader-page-nav').classList.remove('hidden');
     updateSinglePage();
   } else {
-    singleContainer.classList.add('ios-hidden');
-    continuousContainer.classList.remove('ios-hidden');
+    singleContainer.classList.add('hidden');
+    continuousContainer.classList.remove('hidden');
+    document.getElementById('reader-page-nav').classList.add('hidden');
     renderContinuousPages();
   }
 }
@@ -710,25 +598,23 @@ function updateSinglePage() {
   const imgEl = document.getElementById('reader-current-img');
   const loaderEl = document.getElementById('reader-img-loader');
 
-  loaderEl.classList.remove('ios-hidden');
+  loaderEl.classList.remove('hidden');
   imgEl.style.opacity = '0.3';
 
   imgEl.onload = () => {
-    loaderEl.classList.add('ios-hidden');
+    loaderEl.classList.add('hidden');
     imgEl.style.opacity = '1';
   };
   imgEl.onerror = () => {
-    loaderEl.classList.add('ios-hidden');
+    loaderEl.classList.add('hidden');
     imgEl.style.opacity = '1';
-    showToast(`Không thể tải trang ${idx + 1}`);
+    showToast(`Không thể tải trang ${idx + 1}. Thử lại...`);
   };
 
   imgEl.src = imgUrl;
   updateReaderFitClass();
 
-  // Update page indicators
   document.getElementById('reader-page-input').value = idx + 1;
-  document.getElementById('reader-page-indicator-text').textContent = `${idx + 1} / ${book.pages.length}`;
 
   preloadNextPages(idx + 1, 2);
   saveHistory(book, idx + 1);
@@ -736,7 +622,7 @@ function updateSinglePage() {
 
 function updateReaderFitClass() {
   const imgEl = document.getElementById('reader-current-img');
-  imgEl.className = `ios-reader-image ${state.reader.fitMode}`;
+  imgEl.className = `reader-main-img ${state.reader.fitMode}`;
 }
 
 function stepReaderPage(delta) {
@@ -746,7 +632,7 @@ function stepReaderPage(delta) {
 
   const newIdx = state.reader.pageIndex + delta;
   if (newIdx < 0) {
-    showToast('Đây là trang đầu tiên');
+    showToast('Đây là trang đầu tiên!');
     return;
   }
   if (newIdx >= book.pages.length) {
@@ -784,25 +670,16 @@ function renderContinuousPages() {
     const imgUrl = buildPageImageUrl(mediaId, p.path);
 
     const item = document.createElement('div');
-    item.className = 'ios-reader-scroll-page';
+    item.className = 'continuous-page-item';
     item.innerHTML = `
-      <img src="${imgUrl}" alt="Trang ${pageNum}" loading="lazy" referrerpolicy="no-referrer">
-      <div class="page-num">${pageNum} / ${book.pages.length}</div>
+      <img src="${imgUrl}" alt="Page ${pageNum}" class="continuous-page-img" loading="lazy" referrerpolicy="no-referrer">
+      <div class="continuous-page-num">Trang ${pageNum} / ${book.pages.length}</div>
     `;
+
     container.appendChild(item);
   });
 }
 
-function toggleReaderToolbar() {
-  const toolbar = document.getElementById('reader-toolbar');
-  const bottomBar = document.getElementById('reader-bottom-bar');
-  toolbar.classList.toggle('ios-hidden');
-  bottomBar.classList.toggle('ios-hidden');
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-// Keyboard & Fullscreen
-// ═══════════════════════════════════════════════════════════════════════
 function handleGlobalKeyDown(e) {
   if (state.activeView === 'reader') {
     if (e.key === 'ArrowLeft' || e.code === 'KeyA') {
@@ -826,16 +703,13 @@ function toggleFullscreen() {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// Favorites
-// ═══════════════════════════════════════════════════════════════════════
 function toggleFavorite(book, btnEl = null) {
   const id = book.id;
   const isFav = !!state.favorites[id];
 
   if (isFav) {
     delete state.favorites[id];
-    showToast(`Đã xóa #${id} khỏi yêu thích`);
+    showToast(`Đã xóa #${id} khỏi danh sách yêu thích`);
   } else {
     state.favorites[id] = {
       id: book.id,
@@ -847,7 +721,7 @@ function toggleFavorite(book, btnEl = null) {
       num_favorites: book.num_favorites,
       cover: book.cover
     };
-    showToast(`Đã thêm #${id} vào yêu thích! 💖`);
+    showToast(`Đã thêm #${id} vào danh sách yêu thích! 💖`);
   }
 
   localStorage.setItem('nh_favorites', JSON.stringify(state.favorites));
@@ -860,58 +734,29 @@ function toggleFavorite(book, btnEl = null) {
   if (state.currentBook && state.currentBook.id === id) {
     const detailFavBtn = document.getElementById('btn-toggle-fav');
     if (detailFavBtn) {
-      detailFavBtn.textContent = !isFav ? '💔 Bỏ Yêu Thích' : '💖 Yêu Thích';
-      detailFavBtn.className = !isFav ? 'ios-btn ios-btn-danger' : 'ios-btn ios-btn-secondary';
+      detailFavBtn.textContent = !isFav ? '💔 Bỏ Yêu Thích' : '💖 Thêm Vào Yêu Thích';
+      detailFavBtn.className = !isFav ? 'btn btn-outline btn-lg active' : 'btn btn-outline btn-lg';
     }
-  }
-
-  // Re-render if viewing favs
-  if (state.listingType === 'favs') {
-    renderFavsView();
   }
 }
 
 function updateFavBadge() {
   const count = Object.keys(state.favorites).length;
-  const badge = document.getElementById('fav-count-badge');
-  badge.textContent = count;
-  if (count > 0) {
-    badge.classList.remove('ios-hidden');
-  } else {
-    badge.classList.add('ios-hidden');
-  }
+  document.getElementById('fav-count-badge').textContent = count;
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// Favorites View
-// ═══════════════════════════════════════════════════════════════════════
 function renderFavsView() {
   switchView('listing');
-  document.getElementById('popular-banner').classList.add('ios-hidden');
-  document.getElementById('pagination').classList.add('ios-hidden');
-
-  const filterBadge = document.getElementById('active-filter-badge');
-  filterBadge.classList.remove('ios-hidden');
-  filterBadge.textContent = `${Object.keys(state.favorites).length} truyện`;
-
-  document.getElementById('listing-title').textContent = '💖 Yêu Thích';
+  document.getElementById('popular-banner').classList.add('hidden');
+  document.getElementById('pagination').style.display = 'none';
+  document.getElementById('active-filter-badge').classList.remove('hidden');
+  document.getElementById('active-filter-badge').textContent = `Tổng: ${Object.keys(state.favorites).length} truyện`;
+  document.getElementById('listing-title').textContent = '💖 Danh Sách Yêu Thích';
 
   const favList = Object.values(state.favorites);
-  const empty = document.getElementById('listing-empty');
-  if (favList.length === 0) {
-    if (empty) {
-      empty.classList.remove('ios-hidden');
-      document.getElementById('listing-empty-desc').textContent = 'Chưa có truyện yêu thích nào.';
-    }
-  } else {
-    if (empty) empty.classList.add('ios-hidden');
-  }
   renderGalleryGrid(favList);
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// History
-// ═══════════════════════════════════════════════════════════════════════
 function saveHistory(book, lastPage = 1) {
   state.history[book.id] = {
     id: book.id,
@@ -928,32 +773,16 @@ function saveHistory(book, lastPage = 1) {
 
 function renderHistoryView() {
   switchView('listing');
-  document.getElementById('popular-banner').classList.add('ios-hidden');
-  document.getElementById('pagination').classList.add('ios-hidden');
-
-  const filterBadge = document.getElementById('active-filter-badge');
-  filterBadge.classList.remove('ios-hidden');
-  filterBadge.textContent = `${Object.keys(state.history).length} truyện`;
-
-  document.getElementById('listing-title').textContent = '📜 Lịch Sử';
+  document.getElementById('popular-banner').classList.add('hidden');
+  document.getElementById('pagination').style.display = 'none';
+  document.getElementById('active-filter-badge').classList.remove('hidden');
+  document.getElementById('active-filter-badge').textContent = `Đã đọc: ${Object.keys(state.history).length} truyện`;
+  document.getElementById('listing-title').textContent = '📜 Lịch Sử Đọc Truyện';
 
   const historyList = Object.values(state.history).sort((a, b) => b.updatedAt - a.updatedAt);
-
-  const empty = document.getElementById('listing-empty');
-  if (historyList.length === 0) {
-    if (empty) {
-      empty.classList.remove('ios-hidden');
-      document.getElementById('listing-empty-desc').textContent = 'Chưa có lịch sử đọc.';
-    }
-  } else {
-    if (empty) empty.classList.add('ios-hidden');
-  }
   renderGalleryGrid(historyList);
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// Pagination
-// ═══════════════════════════════════════════════════════════════════════
 function changePage(newPage) {
   state.page = newPage;
   if (state.listingType === 'home') {
@@ -969,13 +798,10 @@ function updatePaginationUI() {
   document.getElementById('pg-max').textContent = state.maxPages;
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// Utilities
-// ═══════════════════════════════════════════════════════════════════════
 function showLoader(visible) {
   const loader = document.getElementById('listing-loader');
-  if (visible) loader.classList.remove('ios-hidden');
-  else loader.classList.add('ios-hidden');
+  if (visible) loader.classList.remove('hidden');
+  else loader.classList.add('hidden');
 }
 
 function formatCount(num) {
@@ -987,7 +813,7 @@ function formatCount(num) {
 function showToast(msg) {
   const container = document.getElementById('toast-container');
   const toast = document.createElement('div');
-  toast.className = 'ios-toast';
+  toast.className = 'toast';
   toast.textContent = msg;
   container.appendChild(toast);
   setTimeout(() => toast.remove(), 3000);
