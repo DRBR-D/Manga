@@ -18,6 +18,7 @@ const state = {
   page: 1,
   maxPages: 1,
   currentBook: null,
+  customWorker: localStorage.getItem('nh_custom_worker') || '',
   reader: {
     book: null,
     pageIndex: 0,
@@ -57,7 +58,7 @@ function buildGalleryThumbUrl(mediaId) {
 }
 
 /**
- * Universal API Fetcher with Auto Failover
+ * Universal API Fetcher with Auto Failover & Custom Worker Support
  */
 async function fetchApi(endpoint, params = {}) {
   const cleanParams = { ...params };
@@ -66,12 +67,21 @@ async function fetchApi(endpoint, params = {}) {
   const queryString = new URLSearchParams(cleanParams).toString();
   const directTarget = `https://nhentai.net/api/v2/${endpoint}${queryString ? '?' + queryString : ''}`;
 
-  const candidates = [
-    directTarget,
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(directTarget)}`,
-    `https://corsproxy.io/?${encodeURIComponent(directTarget)}`,
-    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(directTarget)}`
-  ];
+  const candidates = [];
+
+  // Priority 1: Custom Cloudflare Worker Proxy URL if set by user
+  if (state.customWorker) {
+    const cleanWorker = state.customWorker.replace(/\/+$/, '');
+    candidates.push(`${cleanWorker}/${endpoint}${queryString ? '?' + queryString : ''}`);
+  }
+
+  // Priority 2: Direct API fetch
+  candidates.push(directTarget);
+
+  // Priority 3: Fallback CORS Proxies
+  candidates.push(`https://api.allorigins.win/raw?url=${encodeURIComponent(directTarget)}`);
+  candidates.push(`https://corsproxy.io/?${encodeURIComponent(directTarget)}`);
+  candidates.push(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(directTarget)}`);
 
   let lastErr = null;
 
@@ -91,7 +101,7 @@ async function fetchApi(endpoint, params = {}) {
     }
   }
 
-  throw new Error(lastErr ? lastErr.message : 'Không thể kết nối nHentai API do trình duyệt hoặc mạng chặn.');
+  throw new Error(lastErr ? lastErr.message : 'Trình duyệt bị chặn CORS hoặc không thể kết nối nHentai API.');
 }
 
 // App Initialization
@@ -371,20 +381,46 @@ function renderErrorCard(errMsg) {
 
   grid.innerHTML = `
     <div style="grid-column: 1/-1; background: #1c1c1e; border-radius: 16px; padding: 32px 20px; text-align: center; max-width: 600px; margin: 20px auto; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
-      <h3 style="color: #ff453a; margin-bottom: 12px; font-size: 1.2rem;">⚠️ Không Thể Tải Dữ Liệu nHentai API</h3>
+      <h3 style="color: #ff453a; margin-bottom: 12px; font-size: 1.2rem;">⚠️ Trình Duyệt Bị Chặn CORS API nHentai</h3>
       <p style="color: #8e8e93; font-size: 0.9rem; margin-bottom: 20px; line-height: 1.5;">
-        ${errMsg || 'Trình duyệt bị chặn CORS hoặc kết nối bị từ chối do nhà mạng.'}
+        Server nHentai chặn truy cập API từ domain web (CORS Error). 
       </p>
-      
-      <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 20px;">
+
+      <div style="background: #2c2c2e; padding: 16px; border-radius: 12px; text-align: left; margin-bottom: 20px; font-size: 0.85rem; color: #d1d1d6;">
+        <div style="font-weight: 600; color: #0a84ff; margin-bottom: 8px;">💡 Cách xử lý cực dễ (Tạo Worker riêng 1 phút):</div>
+        1. Vào <code>dash.cloudflare.com</code> ➔ <b>Workers & Pages</b> ➔ <b>Create Worker</b>.<br>
+        2. Dán đoạn mã proxy 10 dòng ➔ <b>Save and Deploy</b>.<br>
+        3. Nhập link Worker của bạn bên dưới:
+      </div>
+
+      <div style="display: flex; gap: 8px; margin-bottom: 20px;">
+        <input type="text" id="custom-worker-input" value="${state.customWorker}" placeholder="https://my-proxy.username.workers.dev" style="flex: 1; background: #2c2c2e; border: 1px solid #3a3a3c; color: #fff; padding: 10px 14px; border-radius: 10px; font-size: 0.9rem; outline: none;">
+        <button id="btn-save-worker" class="btn btn-primary" style="padding: 10px 18px; border-radius: 10px; background: #30d158; border: none;">Lưu Worker</button>
+      </div>
+
+      <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 16px;">
         <button id="btn-retry-fetch" class="btn btn-primary" style="padding: 10px 20px; border-radius: 10px;">🔄 Thử lại ngay</button>
       </div>
 
-      <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 16px; font-size: 0.85rem; color: #8e8e93;">
-        💡 <strong>Mẹo:</strong> Bạn có thể nhập trực tiếp ID truyện vào ô tìm kiếm ID (vd: <code>660253</code>) ở góc trên để mở đọc ngay.
+      <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 14px; font-size: 0.85rem; color: #8e8e93;">
+        💡 <strong>Mẹo khác:</strong> Bạn có thể nhập trực tiếp ID truyện vào ô tìm kiếm ID (vd: <code>660253</code>) ở thanh trên cùng để đọc mượt mà không cần tải trang chủ.
       </div>
     </div>
   `;
+
+  const saveWorkerBtn = document.getElementById('btn-save-worker');
+  if (saveWorkerBtn) {
+    saveWorkerBtn.addEventListener('click', () => {
+      const input = document.getElementById('custom-worker-input');
+      if (input) {
+        state.customWorker = input.value.trim();
+        localStorage.setItem('nh_custom_worker', state.customWorker);
+        showToast('Đã lưu Worker URL thành công!');
+        if (state.listingType === 'home') loadHomepage();
+        else loadListing();
+      }
+    });
+  }
 
   const retryBtn = document.getElementById('btn-retry-fetch');
   if (retryBtn) {
